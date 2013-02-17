@@ -158,10 +158,11 @@ void Ifn(Cpu* me, uint32_t* v1, uint32_t* v2){ me->performNextIns = *v1 != *v2; 
 void Ifg(Cpu* me, uint32_t* v1, uint32_t* v2){ me->performNextIns = *v1 > *v2; me->cycles += 2 + (uint32_t)me->performNextIns; }
 void Ifb(Cpu* me, uint32_t* v1, uint32_t* v2){ me->performNextIns = (*v1 & *v2) != 0; me->cycles += 2 + (uint32_t)me->performNextIns; }
 
-Cpu* Cpu_Create()
+Cpu* Cpu_Create(uint8_t* ram, uint32_t ramSize)
 {
 	Cpu* me = calloc(1, sizeof(Cpu));
-	me->ram = calloc(1, sizeof(uint16_t) * 0x10000);
+	//me->ram = calloc(1, sizeof(uint16_t) * 0x10000);
+	me->ram = ram;
 
 	me->performNextIns = true;
 

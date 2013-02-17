@@ -37,6 +37,18 @@ int ReadFile(uint8_t* data, uint32_t size, const char* filename)
 	return (int)fSize;
 }
 
+int ReadFileAlloc(uint8_t** data, const char* filename)
+{
+	FILE* f = fopen(filename, "r");
+	LAssertWarn(f, "could not open file: %s", filename);
+	if(!f) return -1;
+	long fSize = FileSize(f);
+	*data = malloc(fSize);
+	fread(*data, fSize, 1, f);
+	fclose(f);
+	return (int)fSize;
+}
+
 void DumpRam(uint8_t* ram, uint16_t end)
 {
 	for(int i = 0; i < end + 1; i++){

@@ -6,7 +6,7 @@
 
 typedef struct Cpu Cpu;
 
-Cpu* Cpu_Create();
+Cpu* Cpu_Create(uint8_t* ram, uint32_t ramSize);
 void Cpu_Destroy(Cpu** me);
 uint8_t* Cpu_GetRam(Cpu* me);
 int Cpu_Execute(Cpu* me, int cycles);

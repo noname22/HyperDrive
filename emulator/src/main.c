@@ -9,8 +9,10 @@
 
 int logLevel = 0;
 
-int main()
+int main(int argc, char** argv)
 {
+	LAssert(argc == 2, "usage: %s [rom]", argv[0]);
+
 	LogI("== HYPERDRIVE ==");
 
 	SDL_Init(SDL_INIT_EVERYTHING);
@@ -28,7 +30,8 @@ int main()
 
 	bool done = false;
 
-	HyperMachine* hm = HM_Create(w, h, px);
+	HyperMachine* hm = HM_Create(w, h, px, 1024 * 1024 * 16);
+	LAssert(HM_LoadRom(hm, argv[1]), "bailing");
 
 	while(!done){
 		SDL_Event event;

@@ -20,6 +20,7 @@ void DumpRam(uint8_t* ram, uint16_t end);
 
 bool WriteFile(uint8_t* data, uint32_t size, const char* filename);
 int ReadFile(uint8_t* data, uint32_t size, const char* filename);
+int ReadFileAlloc(uint8_t** data, const char* filename);
 
 long FileSize(FILE* f);
 
