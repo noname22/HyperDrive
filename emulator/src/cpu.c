@@ -16,6 +16,8 @@ typedef Vector(SysCall) SysCallVector;
 
 struct Cpu {
 	uint8_t* ram;
+	uint32_t memSize;
+
 	uint32_t regs[8];
 	uint32_t sp, pc, o;
 
@@ -45,12 +47,15 @@ bool Cpu_GetExit(Cpu* me)
 }
 
 uint32_t Cpu_Pop(Cpu* me) { 
-	return me->ram[me->sp += 4];
+	uint32_t ret = *((uint32_t*)(me->ram + me->sp));
+	me->sp += 4;
+	return ret;
 }
 
 void Cpu_Push(Cpu* me, uint32_t v){
+	LogD("pushing: %u", v);
 	me->sp -= 4;
-	me->ram[me->sp] = v;
+	*((uint32_t*)(me->ram + me->sp)) = v;
 }
 
 void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* dcpu, void* data), void* data)
@@ -63,6 +68,7 @@ void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* dcpu, void* data), void* data)
 void NonBasic(Cpu* me, uint32_t* v1, uint32_t* v2)
 {
 	if(*v1 == DI_ExtJsr - DINS_EXT_BASE){
+		LogD("EXT_JSR");
 		Cpu_Push(me, me->pc);
 		me->pc = *v2;
 		me->cycles += 2;
@@ -163,6 +169,8 @@ Cpu* Cpu_Create(uint8_t* ram, uint32_t ramSize)
 	Cpu* me = calloc(1, sizeof(Cpu));
 	//me->ram = calloc(1, sizeof(uint16_t) * 0x10000);
 	me->ram = ram;
+	me->sp = ramSize; // will be decreased before it's written to
+	me->memSize = ramSize;
 
 	me->performNextIns = true;
 
@@ -236,8 +244,8 @@ void Cpu_DumpState(Cpu* me)
 	LogD("Stack: ");
 
 	if(me->sp){
-		for(int i = 0xffff; i >= me->sp; i--){
-			LogD("  0x%04x", me->ram[i]);
+		for(int i = me->memSize - 1; i >= me->sp; i -= 4){
+			LogD("  0x%08x: 0x%08x", i, *((uint32_t*)(me->ram + i)));
 		}
 	}else LogD("  (empty)");
 	LogD(" ");
@@ -271,6 +279,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 	while(me->cycles < execCycles){
 		if(me->inspector) me->inspector(me, me->inspectorData);
 
+		uint32_t addr = me->pc;
 		bool hasNextWord[2];
 		uint32_t val[2];
 		uint16_t pIns = Cpu_ReadRam16(me);
@@ -299,9 +308,9 @@ int Cpu_Execute(Cpu* me, int execCycles)
 			}
 
 			switch(vv){
-				case DV_Pop:          pv[i] = (uint32_t*)me->ram + me->sp++; break;
+				case DV_Pop:          pv[i] = (uint32_t*)(me->ram + me->sp); me->sp += 4; break;
 				case DV_Peek:         pv[i] = (uint32_t*)me->ram + me->sp; break;
-				case DV_Push:         pv[i] = (uint32_t*)me->ram + --me->sp; break;
+				case DV_Push:         me->sp -= 4; pv[i] = (uint32_t*)(me->ram + me->sp); break;
 				case DV_SP:           pv[i] = &me->sp; break;
 				case DV_PC:           pv[i] = &me->pc; break;
 				case DV_O:            pv[i] = &me->o; break;
@@ -332,13 +341,13 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		}
 		
 		if(me->performNextIns){ 
-			LogD("%s", dinsNames[ins]);
+			LogD("%08x: %s", addr, dinsNames[ins]);
 			me->ins[ins](me, pv[0], pv[1]);
 		}
 
 		else me->performNextIns = true;
 
-		//Cpu_DumpState(me);
+		Cpu_DumpState(me);
 
 		if(me->exit) return 0;
 	}
