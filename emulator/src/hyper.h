@@ -6,6 +6,7 @@
 typedef struct HyperMachine HyperMachine;
 
 HyperMachine* HM_Create(int w, int h, uint8_t* display);
+
 void HM_Tick(HyperMachine* me);
 
 #endif

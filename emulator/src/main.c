@@ -1,15 +1,17 @@
 #include <SDL.h>
 
-#include "flog.h"
+#include "log.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
 
 #include "hyper.h"
 
+int logLevel = 0;
+
 int main()
 {
-	FlogI("== HYPERDRIVE ==");
+	LogI("== HYPERDRIVE ==");
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 

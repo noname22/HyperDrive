@@ -1,5 +1,5 @@
 #include "hyper.h"
-#include "flog.h"
+#include "log.h"
 #include <stdlib.h>
 
 struct HyperMachine {
@@ -10,7 +10,7 @@ struct HyperMachine {
 HyperMachine* HM_Create(int w, int h, uint8_t* display)
 {
 	HyperMachine* me = calloc(1, sizeof(HyperMachine));
-	FlogAssert(me, "could not allocate a machine");	
+	LAssert(me, "could not allocate a machine");	
 
 	me->display = display;
 	me->w = w;

@@ -13,4 +13,8 @@
 #define LAssert(__v, ...) if(!(__v)){ LogF(__VA_ARGS__); exit(1); };
 #define LAssertWarn(__v, ...) if(!(__v)){ LogW(__VA_ARGS__); };
 
+extern int logLevel;
+
+#include <stdio.h>
+
 #endif
