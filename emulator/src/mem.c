@@ -75,8 +75,8 @@ void Mem_Write8(Mem* me, uint32_t addr, uint8_t val)
 {
 	uint32_t idx;
 	switch(addr >> 30){
-		case 1: me->rom[addr & me->romMask] = val; break; // ROM
-		case 2: me->ram[(addr & MEM_MASK) & me->ramMask] = val; break; // RAM
+		case 0: me->rom[addr & me->romMask] = val; break; // ROM
+		case 1: me->ram[(addr & MEM_MASK) & me->ramMask] = val; break; // RAM
 		default:
 			// hw register
 			idx = (addr & MEM_MASK) & me->regMask;
@@ -107,8 +107,8 @@ uint8_t Mem_Read8(Mem* me, uint32_t addr)
 {
 	uint32_t idx;
 	switch(addr >> 30){
-		case 1: return me->rom[addr & me->romMask]; // ROM
-		case 2: return me->ram[(addr & MEM_MASK) & me->ramMask]; // RAM
+		case 0: return me->rom[addr & me->romMask]; // ROM
+		case 1: return me->ram[(addr & MEM_MASK) & me->ramMask]; // RAM
 		default:
 			// hw register
 			idx = (addr & MEM_MASK) & me->regMask;
@@ -120,10 +120,10 @@ uint8_t Mem_Read8(Mem* me, uint32_t addr)
 
 uint16_t Mem_Read16(Mem* me, uint32_t addr)
 {
-	return Mem_Read8(me, addr) | (Mem_Read8(me, addr) << 8);
+	return Mem_Read8(me, addr) | (Mem_Read8(me, addr + 1) << 8);
 }
 
 uint32_t Mem_Read32(Mem* me, uint32_t addr)
 {
-	return Mem_Read8(me, addr) | (Mem_Read8(me, addr) << 8) | (Mem_Read8(me, addr) << 16) | (Mem_Read8(me, addr) << 24);
+	return Mem_Read8(me, addr) | (Mem_Read8(me, addr + 1) << 8) | (Mem_Read8(me, addr + 2) << 16) | (Mem_Read8(me, addr + 3) << 24);
 }

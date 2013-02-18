@@ -46,6 +46,7 @@ bool HM_LoadRom(HyperMachine* me, const char* filename)
 
 	if(size < 0) return false;
 
+	LogV("Loaded rom with size: %d", size);
 	Mem_SetROM(me->mem, rom, size);
 
 	free(rom);

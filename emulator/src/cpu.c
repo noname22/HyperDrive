@@ -349,6 +349,8 @@ int Cpu_Execute(Cpu* me, int execCycles)
 
 		else me->performNextIns = true;
 
+		char bb[1024];
+		gets(bb);
 		Cpu_DumpState(me);
 
 		if(me->exit) return 0;

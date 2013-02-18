@@ -1,3 +1,7 @@
+#ifndef WIN32
+#include <signal.h>
+#endif
+
 #include <SDL.h>
 
 #include "log.h"
@@ -16,6 +20,11 @@ int main(int argc, char** argv)
 	LogI("== HYPERDRIVE ==");
 
 	SDL_Init(SDL_INIT_EVERYTHING);
+
+        // Disable ctrl-c catching on linux
+	#ifndef WIN32
+        signal(SIGINT, SIG_DFL);
+	#endif
 
 	const int w = 320, h = 240, mult = 3;
 
