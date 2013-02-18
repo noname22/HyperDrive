@@ -6,7 +6,7 @@
 
 typedef struct HyperMachine HyperMachine;
 
-HyperMachine* HM_Create(int w, int h, uint8_t* display, uint32_t memSize);
+HyperMachine* HM_Create(int w, int h, uint8_t* display);
 
 void HM_Tick(HyperMachine* me);
 bool HM_LoadRom(HyperMachine* me, const char* filename);

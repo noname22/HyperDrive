@@ -57,6 +57,20 @@ Mem* Mem_Create()
 	return me;
 }
 
+bool Mem_SetROM(Mem* me, uint8_t* rom, uint32_t size)
+{
+	memset(me->rom, 0, me->romSize);
+	// XXX check, realocate, etc
+	memcpy(me->rom, rom, size);
+	return true;
+}
+
+uint32_t Mem_GetBOS(Mem* me)
+{
+	// really returns BOS + 1
+	return 0x40000000 + me->ramSize;
+}
+
 void Mem_Write8(Mem* me, uint32_t addr, uint8_t val)
 {
 	uint32_t idx;

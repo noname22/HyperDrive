@@ -1,5 +1,6 @@
 #include "common.h"
 #include "cpu.h"
+#include "mem.h"
 
 typedef void (*InsPtr)(Cpu* me, uint32_t* v1, uint32_t* v2);
 typedef void (*SysCallPtr)(Cpu* me, void* data);
@@ -15,8 +16,7 @@ static const char* dinsNames[] = DINSNAMES;
 typedef Vector(SysCall) SysCallVector;
 
 struct Cpu {
-	uint8_t* ram;
-	uint32_t memSize;
+	Mem* mem;
 
 	uint32_t regs[8];
 	uint32_t sp, pc, o;
@@ -29,8 +29,6 @@ struct Cpu {
 	SysCallVector sysCalls;
 	void (*inspector)(Cpu* dcpu, void* data);
 	void* inspectorData;
-
-	InsPtr ins[DINS_NUM];
 };
 
 // Cast to uint16_t
@@ -47,7 +45,7 @@ bool Cpu_GetExit(Cpu* me)
 }
 
 uint32_t Cpu_Pop(Cpu* me) { 
-	uint32_t ret = *((uint32_t*)(me->ram + me->sp));
+	uint32_t ret = Mem_Read32(me->mem, me->sp);
 	me->sp += 4;
 	return ret;
 }
@@ -55,7 +53,7 @@ uint32_t Cpu_Pop(Cpu* me) {
 void Cpu_Push(Cpu* me, uint32_t v){
 	LogD("pushing: %u", v);
 	me->sp -= 4;
-	*((uint32_t*)(me->ram + me->sp)) = v;
+	Mem_Write32(me->mem, me->sp, v);
 }
 
 void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* dcpu, void* data), void* data)
@@ -64,134 +62,14 @@ void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* dcpu, void* data), void* data)
 	me->inspectorData = data;
 }
 
-// Extended instructions
-void NonBasic(Cpu* me, uint32_t* v1, uint32_t* v2)
-{
-	if(*v1 == DI_ExtJsr - DINS_EXT_BASE){
-		LogD("EXT_JSR");
-		Cpu_Push(me, me->pc);
-		me->pc = *v2;
-		me->cycles += 2;
-	}
-
-	else if(*v1 == DI_ExtSys - DINS_EXT_BASE){
-		me->cycles += 1;
-
-		if(*v2 == 0){
-			me->exit = true;
-			return;
-		}
-
-		SysCall* s;
-		bool found = false;
-		Vector_ForEach(me->sysCalls, s){
-			if(s->id == *v2){
-				s->fun(me, s->data);
-				found = true;
-				break;
-			}
-		}
-		if(!found) LogW("Invalid syscall: %d", *v2);
-	}
-
-	else
-		me->cycles += 1;
-}
-
-// Basic instructions
-void Set(Cpu* me, uint32_t* v1, uint32_t* v2){ *v1 = *v2; me->cycles++; }
-
-void Add(Cpu* me, uint32_t* v1, uint32_t* v2){
-	uint16_t tmp = *v1;
-	*v1 += *v2;
-	me->o = *v1 < tmp;
-	me->cycles += 2;
-}
-
-void Sub(Cpu* me, uint32_t* v1, uint32_t* v2)
-{
-	uint16_t tmp = *v1;
-	*v1 -= *v2;
-	me->o = *v1 > tmp;
-	me->cycles += 2;
-}
-
-void Mul(Cpu* me, uint32_t* v1, uint32_t* v2)
-{
-	me->o = ((uint64_t)*v1 * (uint64_t)*v2 >> 32) & 0xffffffff;
-	*v1 *= *v2;
-	me->cycles += 2;
-}
-
-void Div(Cpu* me, uint32_t* v1, uint32_t* v2)
-{
-	if(*v2 == 0){ me->o = *v1 = 0; return; }
-	me->o = (((uint64_t)*v1 << 32) / ((uint64_t)*v2)) & 0xffffffff;
-
-	// do this twice because v2 can be o
-	if(*v2 == 0){ me->o = *v1 = 0; return; }
-
-	*v1 /= *v2;
-	me->cycles += 3;
-}
-
-void Mod(Cpu* me, uint32_t* v1, uint32_t* v2)
-{
-	if(*v2 == 0){ me->o = *v1 = 0; return; }
-	*v1 %= *v2;
-	me->cycles += 3;
-}
-
-void Shl(Cpu* me, uint32_t* v1, uint32_t* v2)
-{
-	me->o = (((uint64_t)*v1 << (uint64_t)*v2) >> 32) & 0xffffffff;
-	*v1 = *v1 << *v2;
-	me->cycles += 2;
-}
-
-void Shr(Cpu* me, uint32_t* v1, uint32_t* v2)
-{
-	me->o = (((uint64_t)*v1 << 32)>> (uint64_t)*v2) & 0xffffffff;
-	me->cycles += 2;
-}
-
-void And(Cpu* me, uint32_t* v1, uint32_t* v2){ *v1 &= *v2; me->cycles++; }
-void Bor(Cpu* me, uint32_t* v1, uint32_t* v2){ *v1 |= *v2; me->cycles++; }
-void Xor(Cpu* me, uint32_t* v1, uint32_t* v2){ *v1 ^= *v2; me->cycles++; }
-
-void Ife(Cpu* me, uint32_t* v1, uint32_t* v2){ me->performNextIns = *v1 == *v2; me->cycles += 2 + (uint32_t)me->performNextIns; }
-void Ifn(Cpu* me, uint32_t* v1, uint32_t* v2){ me->performNextIns = *v1 != *v2; me->cycles += 2 + (uint32_t)me->performNextIns; }
-void Ifg(Cpu* me, uint32_t* v1, uint32_t* v2){ me->performNextIns = *v1 > *v2; me->cycles += 2 + (uint32_t)me->performNextIns; }
-void Ifb(Cpu* me, uint32_t* v1, uint32_t* v2){ me->performNextIns = (*v1 & *v2) != 0; me->cycles += 2 + (uint32_t)me->performNextIns; }
-
-Cpu* Cpu_Create(uint8_t* ram, uint32_t ramSize)
+Cpu* Cpu_Create(Mem* mem)
 {
 	Cpu* me = calloc(1, sizeof(Cpu));
-	//me->ram = calloc(1, sizeof(uint16_t) * 0x10000);
-	me->ram = ram;
-	me->sp = ramSize; // will be decreased before it's written to
-	me->memSize = ramSize;
-
+	me->mem = mem;
+	me->sp = Mem_GetBOS(mem);
 	me->performNextIns = true;
 
 	Vector_Init(me->sysCalls, SysCall);
-
-	me->ins[DI_NonBasic] = NonBasic;
-	me->ins[DI_Set] = Set;
-	me->ins[DI_Add] = Add;
-	me->ins[DI_Sub] = Sub;
-	me->ins[DI_Mul] = Mul;
-	me->ins[DI_Div] = Div;
-	me->ins[DI_Mod] = Mod;
-	me->ins[DI_Shl] = Shl;
-	me->ins[DI_Shr] = Shr;
-	me->ins[DI_And] = And;
-	me->ins[DI_Bor] = Bor;
-	me->ins[DI_Xor] = Xor;
-	me->ins[DI_Ife] = Ife;
-	me->ins[DI_Ifn] = Ifn;
-	me->ins[DI_Ifg] = Ifg;
-	me->ins[DI_Ifb] = Ifb;
 
 	return me;
 }
@@ -199,8 +77,6 @@ Cpu* Cpu_Create(uint8_t* ram, uint32_t ramSize)
 void Cpu_Destroy(Cpu** me)
 {
 	Vector_Free((*me)->sysCalls);
-
-	free((*me)->ram);
 	free(*me);
 	*me = NULL;
 }
@@ -209,11 +85,6 @@ void Cpu_SetSysCall(Cpu* me, void (*sc)(Cpu* me, void* data), int id, void* data
 {
 	SysCall s = {sc, id, data};
 	Vector_Add(me->sysCalls, s);
-}
-
-uint8_t* Cpu_GetRam(Cpu* me)
-{
-	return me->ram;
 }
 
 uint32_t Cpu_GetRegister(Cpu* me, Cpu_Register reg)
@@ -243,38 +114,21 @@ void Cpu_DumpState(Cpu* me)
 	LogD(" ");
 	LogD("Stack: ");
 
-	if(me->sp){
-		for(int i = me->memSize - 1; i >= me->sp; i -= 4){
-			LogD("  0x%08x: 0x%08x", i, *((uint32_t*)(me->ram + i)));
+	if(me->sp == Mem_GetBOS(me->mem)){
+		for(int i = Mem_GetBOS(me->mem) - 1; i >= me->sp; i -= 4){
+			LogD("  0x%08x: 0x%08x", i, Mem_Read32(me->mem, i));
 		}
 	}else LogD("  (empty)");
 	LogD(" ");
 }
 
-uint8_t Cpu_ReadRam8(Cpu* me)
-{
-	return me->ram[me->pc++];
-}
-
-uint16_t Cpu_ReadRam16(Cpu* me)
-{
-	uint16_t ret = me->ram[me->pc++];
-	ret |= me->ram[me->pc++] << 8;
-	return ret;
-}
-
-uint32_t Cpu_ReadRam32(Cpu* me)
-{
-	uint32_t ret = me->ram[me->pc++];
-	ret |= me->ram[me->pc++] << 8;
-	ret |= me->ram[me->pc++] << 16;
-	ret |= me->ram[me->pc++] << 24;
-	return ret;
-}
 
 int Cpu_Execute(Cpu* me, int execCycles)
 {
 	me->cycles = 0;
+
+	#define READ16 Mem_Read16(me->mem, me->pc); me->pc += 2;
+	#define READ32 Mem_Read32(me->mem, me->pc); me->pc += 4;
 
 	while(me->cycles < execCycles){
 		if(me->inspector) me->inspector(me, me->inspectorData);
@@ -282,10 +136,11 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		uint32_t addr = me->pc;
 		bool hasNextWord[2];
 		uint32_t val[2];
-		uint16_t pIns = Cpu_ReadRam16(me);
+		uint16_t pIns = READ16;
 		DVals v[2];
 
-		uint32_t* pv[2];
+		uint32_t pv[2];
+		uint32_t* reg[2] = {NULL, NULL};
 
 		DIns ins = pIns & 0xf;
 
@@ -297,52 +152,199 @@ int Cpu_Execute(Cpu* me, int execCycles)
 			
 			// Extended instruction, first operand is the instruction number
 			if(i == 0 && ins == DI_NonBasic){
-				val[0] = v[0];
-				pv[i] = val;
+				pv[0] = val[0] = v[0];
 				continue;
 			}
 
 			if((hasNextWord[i] = OpHasNextWord(v[i]))) {
-				val[i] = Cpu_ReadRam32(me);
+				val[i] = READ32;
 				me->cycles++;
 			}
 
 			switch(vv){
-				case DV_Pop:          pv[i] = (uint32_t*)(me->ram + me->sp); me->sp += 4; break;
-				case DV_Peek:         pv[i] = (uint32_t*)me->ram + me->sp; break;
-				case DV_Push:         me->sp -= 4; pv[i] = (uint32_t*)(me->ram + me->sp); break;
-				case DV_SP:           pv[i] = &me->sp; break;
-				case DV_PC:           pv[i] = &me->pc; break;
-				case DV_O:            pv[i] = &me->o; break;
-				case DV_RefNextWord:  pv[i] = (uint32_t*)me->ram + val[i]; break;
-				case DV_NextWord:     pv[i] = val + i; break;
+				case DV_Pop:          pv[i] = me->sp; me->sp += 4; break;
+				case DV_Peek:         pv[i] = me->sp; break;
+				case DV_Push:         me->sp -= 4; pv[i] = me->sp; break;
+				case DV_SP:           reg[i] = &me->sp; break;
+				case DV_PC:           reg[i] = &me->pc; break;
+				case DV_O:            reg[i] = &me->o; break;
+				case DV_RefNextWord:  pv[i] = val[i]; break;
+				case DV_NextWord:     pv[i] = me->pc - 4; break;
 				default:
 					// register
 					if(vv >= DV_A && vv <= DV_J)
-						pv[i] = me->regs + vv - DV_A;
+						reg[i] = me->regs + vv - DV_A;
 
 					// register reference
 					else if(vv >= DV_RefBase && vv <= DV_RefTop)
-						pv[i] = (uint32_t*)me->ram + me->regs[vv - DV_RefBase];
+						pv[i] = me->regs[vv - DV_RefBase];
 
 					// nextword + register reference
 					else if(vv >= DV_RefRegNextWordBase && vv <= DV_RefRegNextWordTop)
-						pv[i] = (uint32_t*)me->ram + U16C(val[i] + me->regs[vv - DV_RefRegNextWordBase]);
+						pv[i] = (uint32_t)(val[i] + me->regs[vv - DV_RefRegNextWordBase]);
 
 					// literal
 					else if(vv >= DV_LiteralBase){
 						val[i] = vv - DV_LiteralBase;
-						pv[i] = val + i;
+						pv[i] = val[i];
 					}
 
 					break;
 			}
-
 		}
+
+		// Sets or gets the data the operand is referring to. Either a register or a memory address.
+		// _o is the zero indexed operand number
+
+		#define OP_GET(_o) (reg[_o] ? *reg[_o] : Mem_Read32(me->mem, pv[_o]))
+		#define OP_SET(_o, _v) (reg[_o] ? *reg[_o] = (_v): Mem_Write32(me->mem, pv[_o], (_v)))
 		
 		if(me->performNextIns){ 
 			LogD("%08x: %s", addr, dinsNames[ins]);
-			me->ins[ins](me, pv[0], pv[1]);
+			//me->ins[ins](me, pv[0], pv[1]);
+			uint32_t tmp, v0 = OP_GET(0), v1 = OP_GET(1);
+
+			switch(ins & 0xf){
+				case DI_Set: 
+					OP_SET(0, v1);
+					me->cycles++; 
+					break;
+
+				case DI_Add: 
+					tmp = v0;
+					v0 += v1;
+					OP_SET(0, v0);
+					
+					me->o = v0 < tmp;
+					me->cycles += 2;
+					break;
+
+				case DI_Sub:
+					tmp = v0 = OP_GET(0);
+					v0 -= OP_GET(1);
+					me->o = v0 > tmp;
+					me->cycles += 2;
+					break;
+
+				case DI_Mul:
+					me->o = ((uint64_t)v0 * (uint64_t)v1 >> 32) & 0xffffffff;
+					v0 *= v0;
+					OP_SET(0, v0);
+					me->cycles += 2;
+					break;
+
+				case DI_Div:
+					if(v1 == 0){
+						me->o = 0;
+						OP_SET(0, 0);
+						break;
+					}
+
+					me->o = (((uint64_t)v0 << 32) / ((uint64_t)v1)) & 0xffffffff;
+
+					// do this twice because v1 can be 0
+					if(v1 == 0){
+						me->o = 0;
+						OP_SET(0, 0);
+						break;
+					}
+
+					v0 /= v1;
+					OP_SET(0, v0);
+					
+					me->cycles += 3;
+					break;
+
+				case DI_Mod:
+					if(v1 == 0){
+						me->o = 0;
+						OP_SET(0, 0);
+						break;
+					}
+
+					v0 %= v1;
+					OP_SET(0, v0);
+					me->cycles += 3;
+					break;
+
+				case DI_Shl:
+					me->o = (((uint64_t)v0 << (uint64_t)v1) >> 32) & 0xffffffff;
+					OP_SET(0, v0 << v1);
+					me->cycles += 2;
+					break;
+				
+				case DI_Shr:
+					me->o = (((uint64_t)v0 << 32)>> (uint64_t)v1) & 0xffffffff;
+					OP_SET(0, v0 >> v1);
+					me->cycles += 2;
+					break;
+
+				case DI_And:
+					OP_SET(0, v0 & v1);
+					me->cycles++;
+					break;
+
+				case DI_Bor:
+					OP_SET(0, v0 | v1);
+					me->cycles++;
+					break;
+
+				case DI_Xor:
+					OP_SET(0, v0 ^ v1);
+					me->cycles++;
+					break;
+				
+				case DI_Ife:
+					me->performNextIns = v0 == v1;
+					me->cycles += 2 + (uint32_t)me->performNextIns;
+					break;
+
+				case DI_Ifn:
+					me->performNextIns = v0 != v1;
+					me->cycles += 2 + (uint32_t)me->performNextIns;
+					break;
+
+				case DI_Ifg:
+					me->performNextIns = v0 > v1;
+					me->cycles += 2 + (uint32_t)me->performNextIns;
+					break;
+
+				case DI_Ifb:
+					me->performNextIns = (v0 & v1) != 0;
+					me->cycles += 2 + (uint32_t)me->performNextIns;
+					break;
+
+				case DI_NonBasic:
+					if(v0 == DI_ExtJsr - DINS_EXT_BASE){
+						LogD("EXT_JSR");
+						Cpu_Push(me, me->pc);
+						me->pc = v1;
+						me->cycles += 2;
+					}
+
+					else if(v0 == DI_ExtSys - DINS_EXT_BASE){
+						me->cycles += 1;
+
+						if(v1 == 0){
+							me->exit = true;
+							break;
+						}
+
+						SysCall* s;
+						bool found = false;
+						Vector_ForEach(me->sysCalls, s){
+							if(s->id == v1){
+								s->fun(me, s->data);
+								found = true;
+								break;
+							}
+						}
+						if(!found) LogW("Invalid syscall: %d", v1);
+					}
+
+					else
+						me->cycles += 1;
+			}
 		}
 
 		else me->performNextIns = true;

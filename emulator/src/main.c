@@ -30,7 +30,7 @@ int main(int argc, char** argv)
 
 	bool done = false;
 
-	HyperMachine* hm = HM_Create(w, h, px, 1024 * 1024 * 16);
+	HyperMachine* hm = HM_Create(w, h, px);
 	LAssert(HM_LoadRom(hm, argv[1]), "bailing");
 
 	while(!done){

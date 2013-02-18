@@ -5,10 +5,10 @@
 #include <stdbool.h>
 
 typedef struct Cpu Cpu;
+typedef struct Mem Mem;
 
-Cpu* Cpu_Create(uint8_t* ram, uint32_t ramSize);
+Cpu* Cpu_Create(Mem* mem);
 void Cpu_Destroy(Cpu** me);
-uint8_t* Cpu_GetRam(Cpu* me);
 int Cpu_Execute(Cpu* me, int cycles);
 
 void Cpu_SetSysCall(Cpu* me, void (*sc)(Cpu* me, void* data), int id, void* data);

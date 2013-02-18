@@ -18,4 +18,7 @@ uint8_t Mem_Read8(Mem* me, uint32_t addr);
 uint16_t Mem_Read16(Mem* me, uint32_t addr);
 uint32_t Mem_Read32(Mem* me, uint32_t addr);
 
+uint32_t Mem_GetBOS(Mem* me);
+bool Mem_SetROM(Mem* me, uint8_t* rom, uint32_t size);
+
 #endif
