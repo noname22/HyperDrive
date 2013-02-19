@@ -1,0 +1,7 @@
+.DEFINE VDP_BASE 0x80000020
+
+:start
+
+
+
+:bitmap .INCBIN 

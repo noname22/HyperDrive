@@ -1,3 +1,4 @@
+//#define LDEBUG
 #include "hyper.h"
 #include "log.h"
 #include <stdlib.h>
@@ -5,38 +6,48 @@
 
 #include "mem.h"
 #include "cpu.h"
+#include "vdp.h"
 
 struct HyperMachine {
-	int w, h;
-	uint8_t* display;
+	Vdp* vdp;
 	Cpu* cpu;
 	Mem* mem;
+
+	int insPerScanLine;
 };
+
+void HM_SysWrite(Cpu* cpu, void* data)
+{
+	HyperMachine* me = data;
+	uint32_t addr = Cpu_Pop(cpu);
+	char c;
+	while((c = Mem_Read8(me->mem, addr++))){
+		fputc(c, stdout);
+	}
+}
 
 HyperMachine* HM_Create(int w, int h, uint8_t* display)
 {
 	HyperMachine* me = calloc(1, sizeof(HyperMachine));
 	LAssert(me, "could not allocate a machine");	
 
-	me->display = display;
-	me->w = w;
-	me->h = h;
-
 	me->mem = Mem_Create();
 	me->cpu = Cpu_Create(me->mem);
+	me->vdp = Vdp_Create(me->mem, w, h, display);
+
+	me->insPerScanLine = (int)(8000000.0 / 60.0 / (float)h);
+
+	Cpu_SetSysCall(me->cpu, HM_SysWrite, 1, me);
 
 	return me;
 }
 
 void HM_Tick(HyperMachine* me)
 {
-	uint8_t* pill = me->display;
-	for(int y = 0; y < me->h; y++){
-		for(int x = 0; x < me->w * 3; x++){
-			*(pill++) = rand() % 256;
-		}
+	LogD("tick");
+	while(Vdp_HandleScanLine(me->vdp)){
+		Cpu_Execute(me->cpu, me->insPerScanLine);
 	}
-	Cpu_Execute(me->cpu, 10);
 }
 
 bool HM_LoadRom(HyperMachine* me, const char* filename)

@@ -11,7 +11,9 @@ typedef struct {
 	void* data;
 } SysCall;
 
+#ifdef LDEBUG
 static const char* dinsNames[] = DINSNAMES;
+#endif
 
 typedef Vector(SysCall) SysCallVector;
 
@@ -23,6 +25,7 @@ struct Cpu {
 
 	bool performNextIns;
 	bool exit;
+	bool wait;
 
 	int cycles;
 
@@ -103,6 +106,16 @@ void Cpu_SetRegister(Cpu* me, Cpu_Register reg, uint32_t val)
 	else me->pc = val;
 }
 
+void Cpu_Interrupt(Cpu* me, int num)
+{
+	uint32_t vec = Mem_Read32(me->mem, MEM_IVT_BASE + num * 4);
+	if(vec == 0) return;
+
+	Cpu_Push(me, me->pc);
+	me->pc = vec;
+	me->wait = false;
+}
+
 void Cpu_DumpState(Cpu* me)
 {
 	LogD(" == Current State ==");
@@ -126,6 +139,7 @@ void Cpu_DumpState(Cpu* me)
 int Cpu_Execute(Cpu* me, int execCycles)
 {
 	me->cycles = 0;
+	if(me->wait) return 0;
 
 	#define READ16 Mem_Read16(me->mem, me->pc); me->pc += 2;
 	#define READ32 Mem_Read32(me->mem, me->pc); me->pc += 4;
@@ -133,7 +147,10 @@ int Cpu_Execute(Cpu* me, int execCycles)
 	while(me->cycles < execCycles){
 		if(me->inspector) me->inspector(me, me->inspectorData);
 
+		#ifdef LDEBUG
 		uint32_t addr = me->pc;
+		#endif
+
 		bool hasNextWord[2];
 		uint32_t val[2];
 		uint16_t pIns = READ16;
@@ -315,18 +332,20 @@ int Cpu_Execute(Cpu* me, int execCycles)
 					break;
 
 				case DI_NonBasic:
-					if(v0 == DI_ExtJsr - DINS_EXT_BASE){
+					LogD("%d %d", v0, v1);
+					if(v0 == DI_ExtJsr){
 						LogD("EXT_JSR");
 						Cpu_Push(me, me->pc);
 						me->pc = v1;
 						me->cycles += 2;
 					}
 
-					else if(v0 == DI_ExtSys - DINS_EXT_BASE){
+					else if(v0 == DI_ExtSys){
+						LogD("SYSCALL");
 						me->cycles += 1;
 
 						if(v1 == 0){
-							me->exit = true;
+							me->wait = true;
 							break;
 						}
 
@@ -349,9 +368,9 @@ int Cpu_Execute(Cpu* me, int execCycles)
 
 		else me->performNextIns = true;
 
-		char bb[1024];
+		/*char bb[1024];
 		gets(bb);
-		Cpu_DumpState(me);
+		Cpu_DumpState(me);*/
 
 		if(me->exit) return 0;
 	}

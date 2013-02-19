@@ -3,7 +3,12 @@
 
 #define Log(__level, __levelstr, ...) do{ if(__level >= logLevel){ printf("[%s] ", (__levelstr)); printf(__VA_ARGS__); puts(""); } } while(0)
 
+#ifdef LDEBUG
 #define LogD(...) Log(0, "DD", __VA_ARGS__)
+#else
+#define LogD(...)
+#endif
+
 #define LogV(...) Log(1, "VV", __VA_ARGS__)
 #define LogI(...) Log(2, "II", __VA_ARGS__)
 #define LogW(...) Log(3, "WW", __VA_ARGS__)

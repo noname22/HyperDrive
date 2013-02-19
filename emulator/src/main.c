@@ -31,10 +31,10 @@ int main(int argc, char** argv)
 	SDL_Surface* screen = SDL_SetVideoMode(w * mult, h * mult, 0, SDL_SWSURFACE);
 
 	// Virtual display pixels
-	uint8_t* px = malloc(w * h * 3);
+	uint8_t* px = calloc(1, w * h * 3);
 
 	// Upscaled display
-	uint8_t* spx = malloc(w * h * mult * mult * 3);
+	uint8_t* spx = calloc(1, w * h * mult * mult * 3);
 	SDL_Surface* scaleSurface = SDL_CreateRGBSurfaceFrom(spx, w * mult, h * mult, 24, w * 3 * mult, 0xff0000, 0xff00, 0xff, 0);
 
 	bool done = false;

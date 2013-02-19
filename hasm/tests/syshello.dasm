@@ -1,0 +1,9 @@
+:start		SET PUSH, m_hello
+		SYS 1
+		SYS 0
+
+;:end		SET PC, end
+
+
+
+:m_hello 	.DW "Hello, World!", 0xa, 0

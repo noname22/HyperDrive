@@ -25,8 +25,9 @@ void Cpu_SetRegister(Cpu* me, Cpu_Register reg, uint32_t val);
 
 void Cpu_SetExit(Cpu* me, bool e);
 bool Cpu_GetExit(Cpu* me);
+void Cpu_Interrupt(Cpu* me, int num);
 
 /* Something to be called before executing each instruction */
-void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* dcpu, void* data), void* data);
+void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* cpu, void* data), void* data);
 
 #endif

@@ -6,6 +6,9 @@
 //   0x00000000 - 0x3FFFFFFF ROM, mirrored
 //   0x40000000 - 0x7FFFFFFF RAM, mirrored 
 //   0x80000000 ...          Hardware registers
+//        +0x00 - 0x1F       Interrupt vectors
+//    ---------------- VDP ------------------
+//        +0x20 - 0x40       8 tile layers
 
 #define MEM_MASK 0x3FFFFFFF
 
@@ -68,7 +71,7 @@ bool Mem_SetROM(Mem* me, uint8_t* rom, uint32_t size)
 uint32_t Mem_GetBOS(Mem* me)
 {
 	// really returns BOS + 1
-	return 0x40000000 + me->ramSize;
+	return MEM_RAM_BASE + me->ramSize;
 }
 
 void Mem_Write8(Mem* me, uint32_t addr, uint8_t val)
@@ -126,4 +129,28 @@ uint16_t Mem_Read16(Mem* me, uint32_t addr)
 uint32_t Mem_Read32(Mem* me, uint32_t addr)
 {
 	return Mem_Read8(me, addr) | (Mem_Read8(me, addr + 1) << 8) | (Mem_Read8(me, addr + 2) << 16) | (Mem_Read8(me, addr + 3) << 24);
+}
+
+uint8_t* Mem_GetPtr(Mem* me, uint32_t addr, uint32_t* size)
+{
+	uint32_t idx;
+	switch(addr >> 30){
+		case 0: 
+			// ROM
+			idx = addr & me->romMask;
+			*size = me->romSize - idx;
+			return me->rom + idx;
+
+		case 1: 
+			// RAM
+			idx = addr & me->ramMask;
+			*size = me->ramSize - idx;
+			return me->ram + idx; 
+
+		default:
+			// hw register
+			idx = (addr & MEM_MASK) & me->regMask;
+			*size = me->regSize - idx;
+			return me->regs + idx;
+	}
 }
