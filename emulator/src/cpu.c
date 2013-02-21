@@ -1,3 +1,5 @@
+//#define LDEBUG
+
 #include "common.h"
 #include "cpu.h"
 #include "mem.h"
@@ -144,7 +146,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 	#define READ16 Mem_Read16(me->mem, me->pc); me->pc += 2;
 	#define READ32 Mem_Read32(me->mem, me->pc); me->pc += 4;
 
-	while(me->cycles < execCycles){
+	while(me->cycles < execCycles && !me->wait){
 		if(me->inspector) me->inspector(me, me->inspectorData);
 
 		#ifdef LDEBUG
@@ -169,7 +171,8 @@ int Cpu_Execute(Cpu* me, int execCycles)
 			
 			// Extended instruction, first operand is the instruction number
 			if(i == 0 && ins == DI_NonBasic){
-				pv[0] = val[0] = v[0];
+				//pv[0] = val[0] = v[0];
+				//LogD("v[0] = %d", v[0]);
 				continue;
 			}
 
@@ -219,7 +222,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		if(me->performNextIns){ 
 			LogD("%08x: %s", addr, dinsNames[ins]);
 			//me->ins[ins](me, pv[0], pv[1]);
-			uint32_t tmp, v0 = OP_GET(0), v1 = OP_GET(1);
+			uint32_t tmp, v0 = ins == DI_NonBasic ? v[0] : OP_GET(0) , v1 = OP_GET(1);
 
 			switch(ins & 0xf){
 				case DI_Set: 
@@ -333,6 +336,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 
 				case DI_NonBasic:
 					LogD("%d %d", v0, v1);
+					v0 += DINS_EXT_BASE;
 					if(v0 == DI_ExtJsr){
 						LogD("EXT_JSR");
 						Cpu_Push(me, me->pc);
@@ -345,6 +349,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 						me->cycles += 1;
 
 						if(v1 == 0){
+							LogD("wait");
 							me->wait = true;
 							break;
 						}

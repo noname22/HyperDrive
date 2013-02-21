@@ -1,0 +1,66 @@
+.DEFINE VDP_BASE 0x80000020
+.DEFINE VDP_X    0x80000028
+.DEFINE VDP_Y    0x8000002C
+
+:start
+	SET A, VDP_BASE
+	
+	; Layer mode
+	SET [A], 1
+	ADD A, 4
+
+	; Width
+	SET [A], 128
+	ADD A, 4
+	
+	; Height
+	SET [A], 128
+	ADD A, 4
+	
+	; X
+	SET [A], 0
+	ADD A, 4
+	
+	; Y
+	SET [A], 0
+	ADD A, 4
+
+	; Tileset (not used)
+	SET [A], 0
+	ADD A, 4
+	
+	; Palette
+	SET [A], pal
+	ADD A, 4
+
+	; Bitmap data
+	SET [A], bitmap
+	ADD A, 4
+
+	; Halt
+	; SYS 0
+
+	SET B, 1
+:loop
+	IFG [0x80000028], 192
+		SET B, -1
+
+	IFE [0x80000028], 0
+		SET B, 1
+
+	ADD [0x80000028], B
+
+	SET C, 100
+;:wait
+;	SUB C, 1
+;	IFN C, 0
+;		SET PC, wait
+
+	SET PUSH, msg
+	SYS 1
+
+	SET PC, loop
+
+:bitmap .INCBIN "bear.dat"
+:pal    .INCBIN "bear.pal"
+:msg    .DW "Hello", 10, 0

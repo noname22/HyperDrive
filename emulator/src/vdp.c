@@ -1,3 +1,4 @@
+#define LDEBUG
 #include <stdlib.h>
 
 #include "vdp.h"
@@ -37,18 +38,28 @@ void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 {
 	// Bitmap mode
 	for(int x = 0; x < me->w; x++){
-		int idx = x - layer->x + (me->y + layer->y) * layer->w;
-		uint8_t spx = idx > 0 && idx < layer->dataSize ? layer->dataPtr[idx] : 0;
-		if(!spx) continue;
+		int xx = x + layer->x;
+		if(xx < 0) continue;
+		if(xx >= layer->w) break;
+
+		int yy = me->y + layer->y;
+		if(yy < 0) continue;
+		if(yy >= layer->h) break;
+
+		int idx = xx + yy * layer->w;
+		if(idx >= layer->dataSize) continue;
+
+		uint8_t spx = layer->dataPtr[idx];
 		
-		*(px++) = layer->palPtr[spx % layer->palSize];
-		*(px++) = layer->palPtr[(spx + 1) % layer->palSize];
-		*(px++) = layer->palPtr[(spx + 2) % layer->palSize];
+		*(px++) = layer->palPtr[(spx * 3 + 2) % layer->palSize];
+		*(px++) = layer->palPtr[(spx * 3 + 1) % layer->palSize];
+		*(px++) = layer->palPtr[(spx * 3) % layer->palSize];
 	}
 }
 
 bool Vdp_HandleScanLine(Vdp* me)
 {
+	static bool once = false;
 	for(int i = 0; i < 8; i++){
 		uint8_t* px = me->p;
 		VLayer layer;
@@ -72,9 +83,21 @@ bool Vdp_HandleScanLine(Vdp* me)
 		layer.tilesetPtr = Mem_GetPtr(me->mem, layer.tileset, &layer.tilesetSize);
 		layer.palPtr = Mem_GetPtr(me->mem, layer.palette, &layer.palSize);
 		layer.dataPtr = Mem_GetPtr(me->mem, layer.data, &layer.dataSize);
+		
+		if(!once){
+			LogD("layer:   %d", i);
+			LogD("mode:    %d", layer.mode);
+			LogD("w, h:    %d, %d", layer.w, layer.h);
+			LogD("x, y:    %d, %d", layer.x, layer.y);
+			LogD("tileset: %08x", layer.tileset);
+			LogD("palette: %08x", layer.palette);
+			LogD("data:    %08x", layer.data);
+			once = true;
+		}
 
 		Vdp_LayerMode1ScanLine(me, &layer, px);
 	}
+	me->p += me->w * 3;
 
 	if(++me->y >= me->h){
 		me->p = me->vMem;
