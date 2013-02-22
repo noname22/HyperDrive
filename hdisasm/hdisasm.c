@@ -33,27 +33,16 @@ void Disasm(uint8_t* ram, uint32_t start)
 
 		bool hasNextWord[2];
 		uint32_t nextWord[2];
-		uint16_t pIns = read16();
 		DVals v[2];
 
-		int numVals = 2;
-
-		DIns ins = pIns & 0xf;
-		v[0] = (pIns >> 4) & 0x3f;
-		v[1] = (pIns >> 10) & 0x3f;
+		DIns ins = read8();
+		v[0] = read8();
+		v[1] = read8();
+		
+		int numVals = InsNumOps(ins);
 
 		for(int i = 0; i < 2; i++){
 			if((hasNextWord[i] = OpHasNextWord(v[i]))) nextWord[i] = read32();
-		}
-		
-		if(ins == DI_NonBasic){
-			numVals = 1;
-			ins = v[0] + DINS_EXT_BASE;
-			v[0] = v[1];
-			hasNextWord[0] = hasNextWord[1];
-			nextWord[0] = nextWord[1];
-
-			hasNextWord[1] = false;
 		}
 		
 		LAssert(ins < DINS_NUM, "illegal instruction: 0x%02x", ins);

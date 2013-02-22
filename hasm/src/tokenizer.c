@@ -52,6 +52,7 @@ char* GetToken(Hasm* me, char* line, char* token)
 	LAssertError(!expecting, "unterminated quotation, expected: '%c'", expecting);	
 	token[at] = '\0';
 
+	// TODO this is broken, eg. [MY_DEFINE] doesn't work
 	// Handle defines	
 	Define* it;
 	Vector_ForEach(*me->defines, it){

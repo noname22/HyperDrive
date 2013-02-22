@@ -1,6 +1,8 @@
 #ifndef HASMI_H
 #define HASMI_H
 
+#define LDEBUG
+
 #include "common.h"
 #include "hasm.h"
 

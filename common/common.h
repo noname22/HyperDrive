@@ -28,5 +28,6 @@ char* StrReplace(char* target, const char* str, const char* what, const char* wi
 int LoadRamMax(uint8_t* rom, const char* filename, uint16_t lastAddr);
 
 bool OpHasNextWord(uint16_t v);
+int InsNumOps(DIns ins);
 
 #endif

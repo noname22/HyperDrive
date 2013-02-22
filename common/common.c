@@ -5,6 +5,12 @@ bool OpHasNextWord(uint16_t v){
 		|| v == DV_RefNextWord || v == DV_NextWord; 
 }
 
+int InsNumOps(DIns ins){
+	if(ins >= DINS_2OP_BASE) return 2;
+	if(ins >= DINS_1OP_BASE) return 1;
+	return 0;
+}
+
 bool WriteFile(uint8_t* data, uint32_t size, const char* filename)
 {
 	FILE* f = fopen(filename, "w");

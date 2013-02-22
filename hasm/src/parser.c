@@ -382,29 +382,13 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			continue;
 		}
 		
-		if(insnum < DINS_EXT_BASE){ LAssertError(toknum == 3, "basic instructions expect 2 operands (not %d)", toknum - 1);}
-		else { LAssertError(toknum == 2, "extended instructions expect 1 operand (not %d)", toknum - 1); }
+		LAssert(toknum - 1 == InsNumOps(insnum), "%s expects %d operands (not %d)", dinsNames[insnum], InsNumOps(insnum), toknum - 1);
 
 		// Line parsed, write parsed stuff
-
 		bool hasNw[] = {OpHasNextWord(operands[0]), OpHasNextWord(operands[1])};
 		
-		if(insnum >= DINS_EXT_BASE){
-			operands[1] = operands[0];
-			operands[0] = insnum - DINS_EXT_BASE;
-			opLabels[1] = opLabels[0];
-
-			hasNw[1] = hasNw[0]; 
-			hasNw[0] = false;
-			nextWord[1] = nextWord[0];
-
-			numOperands = 2;
-			insnum = DI_NonBasic;
-		}
-
 		LogD("Line: '%s'", buffer);
 		LogD("  Instruction: %s (0x%02x)", dinsNames[insnum], insnum);
-		if(insnum == DI_NonBasic) LogD("  Extended Instruction: %s (0x%02x)", dinsNames[DINS_EXT_BASE + operands[0]], operands[0]);
 
 		for(int i = 0; i < numOperands; i++){
 			int v = operands[i];
@@ -415,12 +399,15 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 		}
 
 		// Write to output
-	
-		// Write the instruction and its operands
-		uint16_t ins = (insnum & 0xf) | ((operands[0] & 0x3f) << 4) | ((operands[1] & 0x3f) << 10);
-		Write16(ins);
+
+		// Instruction
+		Write8(insnum);
+
+		// Operands
+		for(int i = 0; i < numOperands; i++)
+			Write8(operands[i]);
 		
-		// Write "nextwords"
+		// "Nextwords"
 		for(int i = 0; i < numOperands; i++){
 			if(hasNw[i]){
 				// This refers to a label
@@ -433,12 +420,14 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			}
 		}
 
-		char dump[64];
-		memset(dump, 0, 64);
-		char* d = dump;
+		if(logLevel == 0){
+			char dump[128];
+			memset(dump, 0, 128);
+			char* d = dump;
 
-		for(int i = 0; i < wrote; i++) d += sprintf(d, "%04x ", me->ram[addr - wrote + i]);
-		LogD("  Output: %s", dump);
+			for(int i = 0; i < wrote; i++) d += sprintf(d, "%08x ", me->ram[addr - wrote + i]);
+			LogD("  Output: %s", dump);
+		}
 	
 		WriteDebugInfo(me, addr, wrote, labelsAdded);
 		
@@ -453,5 +442,3 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 
 	return addr;
 }
-
-
