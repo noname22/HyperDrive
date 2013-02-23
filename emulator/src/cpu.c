@@ -15,6 +15,7 @@ typedef struct {
 
 #ifdef LDEBUG
 static const char* dinsNames[] = DINSNAMES;
+static const char* dvalNames[] = VALNAMES;
 #endif
 
 typedef Vector(SysCall) SysCallVector;
@@ -143,6 +144,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 	me->cycles = 0;
 	if(me->wait) return 0;
 
+	#define READ8 Mem_Read8(me->mem, me->pc); me->pc ++;
 	#define READ16 Mem_Read16(me->mem, me->pc); me->pc += 2;
 	#define READ32 Mem_Read32(me->mem, me->pc); me->pc += 4;
 
@@ -153,35 +155,38 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		uint32_t addr = me->pc;
 		#endif
 
-		bool hasNextWord[2];
 		uint32_t val[2];
-		uint16_t pIns = READ16;
 		DVals v[2];
 
 		uint32_t pv[2];
 		uint32_t* reg[2] = {NULL, NULL};
 
-		DIns ins = pIns & 0xf;
+		DIns ins = READ8;
+		
+		if(ins >= DINS_NUM){
+			LogW("illegal instruction: 0x%02x", ins);
+			continue;
+		}
 
-		v[0] = (pIns >> 4) & 0x3f;
-		v[1] = (pIns >> 10) & 0x3f;
+		LogD("%08x: %s", addr, dinsNames[ins]);
 
-		for(int i = 0; i < 2; i++){
-			DVals vv = v[i];
-			
-			// Extended instruction, first operand is the instruction number
-			if(i == 0 && ins == DI_NonBasic){
-				//pv[0] = val[0] = v[0];
-				//LogD("v[0] = %d", v[0]);
+		int numOps = InsNumOps(ins);
+
+		for(int i = 0; i < numOps; i++){
+			v[i] = READ8;
+			if(v[i] >= DVALS_NUM){
+				LogW("illegal operand: 0x%02x", v[i]);
 				continue;
 			}
 
-			if((hasNextWord[i] = OpHasNextWord(v[i]))) {
+			LogD("  op %d: %s", i + 1, dvalNames[v[i]]);
+			
+			if((OpHasNextWord(v[i]))){
 				val[i] = READ32;
-				me->cycles++;
+				LogD("  NW: %08x", val[i]);
 			}
 
-			switch(vv){
+			switch(v[i]){
 				case DV_Pop:          pv[i] = me->sp; me->sp += 4; break;
 				case DV_Peek:         pv[i] = me->sp; break;
 				case DV_Push:         me->sp -= 4; pv[i] = me->sp; break;
@@ -192,22 +197,16 @@ int Cpu_Execute(Cpu* me, int execCycles)
 				case DV_NextWord:     pv[i] = me->pc - 4; break;
 				default:
 					// register
-					if(vv >= DV_A && vv <= DV_J)
-						reg[i] = me->regs + vv - DV_A;
+					if(v[i] >= DV_A && v[i] <= DV_J)
+						reg[i] = me->regs + v[i] - DV_A;
 
 					// register reference
-					else if(vv >= DV_RefBase && vv <= DV_RefTop)
-						pv[i] = me->regs[vv - DV_RefBase];
+					else if(v[i] >= DV_RefBase && v[i] <= DV_RefTop)
+						pv[i] = me->regs[v[i] - DV_RefBase];
 
 					// nextword + register reference
-					else if(vv >= DV_RefRegNextWordBase && vv <= DV_RefRegNextWordTop)
-						pv[i] = (uint32_t)(val[i] + me->regs[vv - DV_RefRegNextWordBase]);
-
-					// literal
-					else if(vv >= DV_LiteralBase){
-						val[i] = vv - DV_LiteralBase;
-						pv[i] = val[i];
-					}
+					else if(v[i] >= DV_RefRegNextWordBase && v[i] <= DV_RefRegNextWordTop)
+						pv[i] = (uint32_t)(val[i] + me->regs[v[i] - DV_RefRegNextWordBase]);
 
 					break;
 			}
@@ -220,135 +219,128 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		#define OP_SET(_o, _v) (reg[_o] ? *reg[_o] = (_v): Mem_Write32(me->mem, pv[_o], (_v)))
 		
 		if(me->performNextIns){ 
-			LogD("%08x: %s", addr, dinsNames[ins]);
 			//me->ins[ins](me, pv[0], pv[1]);
-			uint32_t tmp, v0 = ins == DI_NonBasic ? v[0] : OP_GET(0) , v1 = OP_GET(1);
+			uint32_t tmp, op[2] = {0};
+			for(int i = 0; i < numOps; i++){
+				op[i] = OP_GET(i);
+			}
 
-			switch(ins & 0xf){
+			switch(ins){
 				case DI_Set: 
-					OP_SET(0, v1);
+					OP_SET(0, op[1]);
 					me->cycles++; 
 					break;
 
 				case DI_Add: 
-					tmp = v0;
-					v0 += v1;
-					OP_SET(0, v0);
+					tmp = op[0];
+					op[0] += op[1];
+					OP_SET(0, op[0]);
 					
-					me->o = v0 < tmp;
+					me->o = op[0] < tmp;
 					me->cycles += 2;
 					break;
 
 				case DI_Sub:
-					tmp = v0 = OP_GET(0);
-					v0 -= OP_GET(1);
-					me->o = v0 > tmp;
+					tmp = op[0] = OP_GET(0);
+					op[0] -= OP_GET(1);
+					me->o = op[0] > tmp;
 					me->cycles += 2;
 					break;
 
 				case DI_Mul:
-					me->o = ((uint64_t)v0 * (uint64_t)v1 >> 32) & 0xffffffff;
-					v0 *= v0;
-					OP_SET(0, v0);
+					me->o = ((uint64_t)op[0] * (uint64_t)op[1] >> 32) & 0xffffffff;
+					op[0] *= op[0];
+					OP_SET(0, op[0]);
 					me->cycles += 2;
 					break;
 
 				case DI_Div:
-					if(v1 == 0){
+					if(op[1] == 0){
 						me->o = 0;
 						OP_SET(0, 0);
 						break;
 					}
 
-					me->o = (((uint64_t)v0 << 32) / ((uint64_t)v1)) & 0xffffffff;
+					me->o = (((uint64_t)op[0] << 32) / ((uint64_t)op[1])) & 0xffffffff;
 
-					// do this twice because v1 can be 0
-					if(v1 == 0){
+					// do this twice because op[1] can be 0
+					if(op[1] == 0){
 						me->o = 0;
 						OP_SET(0, 0);
 						break;
 					}
 
-					v0 /= v1;
-					OP_SET(0, v0);
+					op[0] /= op[1];
+					OP_SET(0, op[0]);
 					
 					me->cycles += 3;
 					break;
 
 				case DI_Mod:
-					if(v1 == 0){
+					if(op[1] == 0){
 						me->o = 0;
 						OP_SET(0, 0);
 						break;
 					}
 
-					v0 %= v1;
-					OP_SET(0, v0);
+					op[0] %= op[1];
+					OP_SET(0, op[0]);
 					me->cycles += 3;
 					break;
 
 				case DI_Shl:
-					me->o = (((uint64_t)v0 << (uint64_t)v1) >> 32) & 0xffffffff;
-					OP_SET(0, v0 << v1);
+					me->o = (((uint64_t)op[0] << (uint64_t)op[1]) >> 32) & 0xffffffff;
+					OP_SET(0, op[0] << op[1]);
 					me->cycles += 2;
 					break;
 				
 				case DI_Shr:
-					me->o = (((uint64_t)v0 << 32)>> (uint64_t)v1) & 0xffffffff;
-					OP_SET(0, v0 >> v1);
+					me->o = (((uint64_t)op[0] << 32)>> (uint64_t)op[1]) & 0xffffffff;
+					OP_SET(0, op[0] >> op[1]);
 					me->cycles += 2;
 					break;
 
 				case DI_And:
-					OP_SET(0, v0 & v1);
+					OP_SET(0, op[0] & op[1]);
 					me->cycles++;
 					break;
 
 				case DI_Bor:
-					OP_SET(0, v0 | v1);
+					OP_SET(0, op[0] | op[1]);
 					me->cycles++;
 					break;
 
 				case DI_Xor:
-					OP_SET(0, v0 ^ v1);
+					OP_SET(0, op[0] ^ op[1]);
 					me->cycles++;
 					break;
 				
 				case DI_Ife:
-					me->performNextIns = v0 == v1;
+					me->performNextIns = op[0] == op[1];
 					me->cycles += 2 + (uint32_t)me->performNextIns;
 					break;
 
 				case DI_Ifn:
-					me->performNextIns = v0 != v1;
+					me->performNextIns = op[0] != op[1];
 					me->cycles += 2 + (uint32_t)me->performNextIns;
 					break;
 
 				case DI_Ifg:
-					me->performNextIns = v0 > v1;
+					me->performNextIns = op[0] > op[1];
 					me->cycles += 2 + (uint32_t)me->performNextIns;
 					break;
 
 				case DI_Ifb:
-					me->performNextIns = (v0 & v1) != 0;
+					me->performNextIns = (op[0] & op[1]) != 0;
 					me->cycles += 2 + (uint32_t)me->performNextIns;
 					break;
 
-				case DI_NonBasic:
-					LogD("%d %d", v0, v1);
-					v0 += DINS_EXT_BASE;
-					if(v0 == DI_ExtJsr){
-						LogD("EXT_JSR");
-						Cpu_Push(me, me->pc);
-						me->pc = v1;
-						me->cycles += 2;
-					}
-
-					else if(v0 == DI_ExtSys){
+				case DI_Sys:
+					do{
 						LogD("SYSCALL");
 						me->cycles += 1;
 
-						if(v1 == 0){
+						if(op[0] == 0){
 							LogD("wait");
 							me->wait = true;
 							break;
@@ -357,17 +349,22 @@ int Cpu_Execute(Cpu* me, int execCycles)
 						SysCall* s;
 						bool found = false;
 						Vector_ForEach(me->sysCalls, s){
-							if(s->id == v1){
+							if(s->id == op[0]){
 								s->fun(me, s->data);
 								found = true;
 								break;
 							}
 						}
-						if(!found) LogW("Invalid syscall: %d", v1);
-					}
+						if(!found) LogW("Invalid syscall: %d", op[0]);
 
-					else
-						me->cycles += 1;
+					}while(0);
+					break;
+
+				case DI_Jsr:
+					Cpu_Push(me, me->pc);
+					me->pc = op[0];
+					me->cycles += 2;
+					break;
 			}
 		}
 

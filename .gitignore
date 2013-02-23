@@ -1,3 +1,4 @@
 emulator/hyperdrive
 hdisasm/hdisasm
 hasm/hasm
+*.bin
