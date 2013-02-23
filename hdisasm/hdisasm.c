@@ -1,3 +1,4 @@
+#define LDEBUG
 #include "common.h"
 
 static const char* dinsNames[] = DINSNAMES;
@@ -31,35 +32,27 @@ void Disasm(uint8_t* ram, uint32_t start)
 			return ret;
 		}
 
-		bool hasNextWord[2];
-		uint32_t nextWord[2];
-		DVals v[2];
-
 		DIns ins = read8();
-		v[0] = read8();
-		v[1] = read8();
-		
-		int numVals = InsNumOps(ins);
-
-		for(int i = 0; i < 2; i++){
-			if((hasNextWord[i] = OpHasNextWord(v[i]))) nextWord[i] = read32();
-		}
-		
 		LAssert(ins < DINS_NUM, "illegal instruction: 0x%02x", ins);
 
 		int n = printf("\t%s ", dinsNames[ins]);
 
-		for(int i = 0; i < numVals; i++){
-			LogD("nextWord: %02x", nextWord[i]);
-			LogD("hasNExtWord: %d", hasNextWord[i]);
+		for(int i = 0; i < InsNumOps(ins); i++){
+			DVals op = read8();
+			LAssert(op < DVALS_NUM, "illegal operand value: 0x%02x", op);
 			char numStr[64] = {0};
-			if(hasNextWord[i]) sprintf(numStr, "0x%02x", nextWord[i]);
 
+			if(OpHasNextWord(op))
+				sprintf(numStr, "0x%02x", read32());
+			
+			LogD("op: %d", op);
 			char str[64];
-			n += printf("%s", StrReplace(str, valNames[v[i]], "NW", numStr));
-			if(i == 0 && numVals == 2) n += printf(", ");
+			n += printf("%s", StrReplace(str, valNames[op], "NW", numStr));
+
+			if(i < InsNumOps(ins) - 1)
+				n += printf(", ");
 		}
-		
+
 		printf("%*s", 40 - n, "; ");
 		printf("0x%08x | ", pc - hasRead);
 		for(int i = 0; i < hasRead; i++) printf("%02x ", ram[pc - hasRead + i]);

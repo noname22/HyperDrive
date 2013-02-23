@@ -10,7 +10,7 @@ typedef enum {
 	DI_Shr, DI_And, DI_Bor, DI_Xor, DI_Ife, DI_Ifn, DI_Ifg, DI_Ifb,
 } DIns;
 
-#define DINS_NUM DI_Ifb
+#define DINS_NUM (DI_Ifb + 1)
 #define DINS_1OP_BASE DI_Jsr
 #define DINS_2OP_BASE DI_Set
 
@@ -27,6 +27,8 @@ typedef enum {
 	DV_O,
 	DV_RefNextWord, DV_NextWord
 } DVals;
+
+#define DVALS_NUM (DV_NextWord + 1)
 
 #define VALNAMES {\
 	"A", "B", "C", "X", "Y", "Z", "I", "J",\

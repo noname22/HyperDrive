@@ -384,32 +384,20 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 		
 		LAssert(toknum - 1 == InsNumOps(insnum), "%s expects %d operands (not %d)", dinsNames[insnum], InsNumOps(insnum), toknum - 1);
 
-		// Line parsed, write parsed stuff
-		bool hasNw[] = {OpHasNextWord(operands[0]), OpHasNextWord(operands[1])};
-		
-		LogD("Line: '%s'", buffer);
-		LogD("  Instruction: %s (0x%02x)", dinsNames[insnum], insnum);
-
-		for(int i = 0; i < numOperands; i++){
-			int v = operands[i];
-			LogD("  Operand %d: %s (0x%02x)", i + 1, valNames[v], v);
-			if(hasNw[i]){
-				LogD("  NextWord: 0x%04x", nextWord[i]);
-			}
-		}
-
 		// Write to output
 
 		// Instruction
 		Write8(insnum);
 
+		LogD("Line: '%s'", buffer);
+		LogD("  Instruction: %s (0x%02x)", dinsNames[insnum], insnum);
+
 		// Operands
-		for(int i = 0; i < numOperands; i++)
+		for(int i = 0; i < numOperands; i++){
+			LogD("  Operand %d: %s (0x%02x)", i + 1, valNames[operands[i]], operands[i]);
 			Write8(operands[i]);
 		
-		// "Nextwords"
-		for(int i = 0; i < numOperands; i++){
-			if(hasNw[i]){
+			if(OpHasNextWord(operands[i])){
 				// This refers to a label
 				if(opLabels[i]){
 					Labels_Get(me->labels, opLabels[i], addr, addr - wrote, me->currentFile, me->lineNumber);
@@ -417,6 +405,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 				}
 
 				Write32(nextWord[i]);
+				LogD("  NextWord: 0x%08x", nextWord[i]);
 			}
 		}
 
@@ -425,7 +414,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			memset(dump, 0, 128);
 			char* d = dump;
 
-			for(int i = 0; i < wrote; i++) d += sprintf(d, "%08x ", me->ram[addr - wrote + i]);
+			for(int i = 0; i < wrote; i++) d += sprintf(d, "%02x ", me->ram[addr - wrote + i]);
 			LogD("  Output: %s", dump);
 		}
 	
