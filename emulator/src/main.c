@@ -13,12 +13,14 @@
 
 int logLevel = 0;
 
-int main(int argc, char** argv)
+typedef struct {
+	int freq;
+	const char* file;
+	const char* debugFile;
+} Settings;
+
+int Start(Settings* settings)
 {
-	LAssert(argc == 2, "usage: %s [rom]", argv[0]);
-
-	LogI("== HYPERDRIVE ==");
-
 	SDL_Init(SDL_INIT_EVERYTHING);
 
         // Disable ctrl-c catching on linux
@@ -39,8 +41,8 @@ int main(int argc, char** argv)
 
 	bool done = false;
 
-	HyperMachine* hm = HM_Create(w, h, px);
-	LAssert(HM_LoadRom(hm, argv[1]), "bailing");
+	HyperMachine* hm = HM_Create(w, h, px, settings->debugFile != NULL);
+	LAssert(HM_LoadRom(hm, settings->file, settings->debugFile), "bailing");
 
 	while(!done){
 		SDL_Event event;
@@ -76,3 +78,57 @@ int main(int argc, char** argv)
 
 	return 0;
 }
+
+int main(int argc, char** argv)
+{
+	const char* usage = "usage: %s (-vX | -d) [hyperdrive ROM file]";
+	LAssert(argc >= 2, usage, argv[0]);
+
+	Settings settings;
+	memset(&settings, 0, sizeof(Settings));
+
+	settings.freq = 7000;
+
+	bool debugging = false;
+
+	logLevel = 2;
+	
+	int numFiles = 0;
+	float fFreq;
+
+	for(int i = 1; i < argc; i++){
+		char* v = argv[i];
+		if(v[0] == '-'){
+			if(!strcmp(v, "-h")){
+				LogI(usage, argv[0]);
+				LogI(" ");
+				LogI("Available flags:");
+				LogI("  -vX   set log level, where X is [0-5] - default: 2");
+				LogI("  -d    start with debugger");
+				LogI("  -fF   interpret at frequency F in MHz - default 7.0 MHz, 0.0 = as fast as possible");
+				return 0;
+			}
+			else if(sscanf(v, "-f%f", &fFreq) == 1){ settings.freq = (int)(fFreq * 1000.0f); }
+			else if(sscanf(v, "-v%d", &logLevel) == 1){}
+			else if(!strcmp(v, "-d")){ debugging = true; }
+			else{
+				LogF("No such flag: %s", v);
+				return 1;
+			}
+		}else{
+			numFiles++;
+			settings.file = v;
+		}
+	}
+
+	LAssert(numFiles == 1, "Please specify one file to run");
+
+	if(debugging){	
+		char tmp[512] = {0};
+		strcat(tmp, settings.file);
+		strcat(tmp, ".dbg");
+		settings.debugFile = tmp;
+	}
+
+	return Start(&settings);}
+

@@ -8,10 +8,14 @@
 #include "cpu.h"
 #include "vdp.h"
 
+#include "debug.h"
+
 struct HyperMachine {
 	Vdp* vdp;
 	Cpu* cpu;
 	Mem* mem;
+
+	Debug* debug;
 
 	int insPerScanLine;
 };
@@ -26,7 +30,7 @@ void HM_SysWrite(Cpu* cpu, void* data)
 	}
 }
 
-HyperMachine* HM_Create(int w, int h, uint8_t* display)
+HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug)
 {
 	HyperMachine* me = calloc(1, sizeof(HyperMachine));
 	LAssert(me, "could not allocate a machine");	
@@ -39,6 +43,10 @@ HyperMachine* HM_Create(int w, int h, uint8_t* display)
 
 	Cpu_SetSysCall(me->cpu, HM_SysWrite, 1, me);
 
+	if(debug)
+		me->debug = Debug_Create(me->cpu, me->mem);
+		
+
 	return me;
 }
 
@@ -50,7 +58,7 @@ void HM_Tick(HyperMachine* me)
 	}
 }
 
-bool HM_LoadRom(HyperMachine* me, const char* filename)
+bool HM_LoadRom(HyperMachine* me, const char* filename, const char* debugFilename)
 {
 	uint8_t* rom = NULL;
 	int size = ReadFileAlloc(&rom, filename);
@@ -61,6 +69,9 @@ bool HM_LoadRom(HyperMachine* me, const char* filename)
 	Mem_SetROM(me->mem, rom, size);
 
 	free(rom);
+	
+	if(debugFilename)
+		Debug_LoadSymbols(me->debug, debugFilename);
 
 	return true;
 }

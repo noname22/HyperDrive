@@ -6,9 +6,9 @@
 
 typedef struct HyperMachine HyperMachine;
 
-HyperMachine* HM_Create(int w, int h, uint8_t* display);
+HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug);
 
 void HM_Tick(HyperMachine* me);
-bool HM_LoadRom(HyperMachine* me, const char* filename);
+bool HM_LoadRom(HyperMachine* me, const char* filename, const char* debugFilename);
 
 #endif
