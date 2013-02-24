@@ -22,7 +22,7 @@
 	ADD A, 4
 	
 	; Y
-	SET [A], 0
+	SET [A], 56
 	ADD A, 4
 
 	; Tileset (not used)
@@ -40,24 +40,34 @@
 	; Halt
 	; SYS 0
 
-	SET B, 1
+	SET X, 1
+	;SET Y, 1
+
 :loop
-	IFG [0x80000028], 192
-		SET B, -1
+	IFG [0x8000002C], 192
+		SET X, -1
 
-	IFE [0x80000028], 0
-		SET B, 1
+	IFE [0x8000002C], 0
+		SET X, 1
 
-	ADD [0x80000028], B
+	ADD [0x8000002C], X
+	
+	;IFG [0x80000030], 112
+	;	SET Y, -1
+
+	;IFE [0x80000030], 0
+	;	SET Y, 1
+
+	;ADD [0x80000030], Y
 
 	SET C, 100
-;:wait
-;	SUB C, 1
-;	IFN C, 0
-;		SET PC, wait
+:wait
+	SUB C, 1
+	IFN C, 0
+		SET PC, wait
 
-	SET PUSH, msg
-	SYS 1
+	;SET PUSH, msg
+	;SYS 1
 
 	SET PC, loop
 

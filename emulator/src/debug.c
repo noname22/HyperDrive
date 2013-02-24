@@ -197,6 +197,9 @@ DebugSymbol* GetSymbolFromAddress(Debug* me, uint32_t addr)
 
 void Debug_Inspector(Cpu* cpu, void* vme)
 {
+	if(!Cpu_GetPerformIns(cpu))
+		return;
+
 	Debug* me = vme;
 	me->insExec++;
 	bool done = false;
@@ -246,9 +249,11 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 		if(Cpu_GetRegister(cpu, DR_PC) != 0 && !Cpu_GetExit(cpu)){
 			char buffer[8];
 			printf("program already running, restart? (y/n) ");
-			fgets(buffer, sizeof(buffer), stdin);
+			if(fgets(buffer, sizeof(buffer), stdin) == NULL)
+				return;
 
-			if(buffer[0] != 'y') return;
+			if(buffer[0] != 'y')
+				return;
 		}
 
 		Cpu_SetExit(cpu, false);
@@ -281,9 +286,9 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 		RAssert((!strcmp(argv[1], "list") && argc == 2) || argc == 3, 
 			"invalid action or number of arguments, see help break\n");
 
-		void AddBreakPointAddr(uint16_t addr){
+		void AddBreakPointAddr(uint32_t addr){
 			Debug_AddBreakPointAddr(me, addr);
-			printf("added breakpoint at address 0x%04x\n", addr);
+			printf("added breakpoint at address 0x%08x\n", addr);
 		}
 
 		void AddBreakPointLine(const char* filename, int line){
@@ -366,10 +371,11 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 		Printable printables[] = {
 			{"a", DR_A}, {"b", DR_B}, {"c", DR_C}, {"x", DR_X}, {"y", DR_Y}, {"z", DR_Z}, 
 			{"i", DR_I}, {"j", DR_J}, {"sp", DR_SP}, {"pc", DR_PC}, {"o", DR_O}, 
-			{"regs", -2}, {"stack", -3}
+			{"regs", -2}, {"stack", -3}, {"@address", -4}
 		};
 	
 		int Lookup(const char* str){
+			if(str[0] == '@') return -4;
 			for(int i = 0; i < sizeof(printables) / sizeof(Printable); i++){
 				if(!strcmp(printables[i].what, str)) return printables[i].v;
 			}
@@ -405,13 +411,23 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 
 			// stack
 			else if(what == -3){
-				uint16_t sp = Cpu_GetRegister(cpu, DR_SP);
+				uint32_t sp = Cpu_GetRegister(cpu, DR_SP);
 
 				if(sp){
 					for(int i = Mem_GetBOS(me->mem); i >= sp; i--){
-						printf("  0x%02x\n", Mem_Read8(me->mem, i));
+						printf("  0x%08x\n", Mem_Read32(me->mem, i));
 					}
 				}else printf("  (empty)\n");
+			}
+
+			else if(what == -4){
+				unsigned addr;
+				if(sscanf(argv[i], "@0x%x", &addr) == 1 || sscanf(argv[i], "@%u", &addr) == 1){
+					printf("[%08x] 8/0x%02x 16/0x%04x 32/0x%08x\n", 
+						addr, Mem_Read8(me->mem, addr), Mem_Read16(me->mem, addr), Mem_Read32(me->mem, addr));
+				}else{
+					printf("could not parse address %s", argv[i]);
+				}
 			}
 		}
 	}
@@ -443,7 +459,7 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 			" or forever if nothing is specified.\n"},
 
 		{"print", Print, "prints status information",
-			"  print [r] ([r], [r]...) where r is a|b|c|x|y|z|i|j|o|sp|pc|regs|stack"
+			"  print [r] ([r], [r]...) where r is a|b|c|x|y|z|i|j|o|sp|pc|regs|stack|@[addr]|@[0xhexaddr]"
 			"                  prints the value of the given register(s)/stack\n"
 		},
 		
@@ -463,7 +479,6 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 		};
 
 	int nCommands = sizeof(commands) / sizeof(Command);	
-	LogD("nCommands: %d", nCommands);
 
 	void Help(int argc, char** argv)
 	{

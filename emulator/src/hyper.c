@@ -30,7 +30,7 @@ void HM_SysWrite(Cpu* cpu, void* data)
 	}
 }
 
-HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug)
+HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug, int freq)
 {
 	HyperMachine* me = calloc(1, sizeof(HyperMachine));
 	LAssert(me, "could not allocate a machine");	
@@ -39,7 +39,7 @@ HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug)
 	me->cpu = Cpu_Create(me->mem);
 	me->vdp = Vdp_Create(me->mem, w, h, display);
 
-	me->insPerScanLine = (int)(8000000.0 / 60.0 / (float)h);
+	me->insPerScanLine = (int)((float)freq / 60.0 / (float)h);
 
 	Cpu_SetSysCall(me->cpu, HM_SysWrite, 1, me);
 

@@ -37,7 +37,7 @@ int ReadFile(uint8_t* data, uint32_t size, const char* filename)
 	}
 
 	memset(data, 0, size);
-	fread(data, fSize, 1, f);
+	LAssertWarn(fread(data, fSize, 1, f), "could not read file: %s", filename);
 	fclose(f);
 
 	return (int)fSize;
@@ -50,7 +50,7 @@ int ReadFileAlloc(uint8_t** data, const char* filename)
 	if(!f) return -1;
 	long fSize = FileSize(f);
 	*data = malloc(fSize);
-	fread(*data, fSize, 1, f);
+	LAssertWarn(fread(*data, fSize, 1, f), "could not read file: %s", filename);
 	fclose(f);
 	return (int)fSize;
 }

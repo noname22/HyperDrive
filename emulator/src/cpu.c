@@ -62,10 +62,15 @@ void Cpu_Push(Cpu* me, uint32_t v){
 	Mem_Write32(me->mem, me->sp, v);
 }
 
-void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* dcpu, void* data), void* data)
+void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* cpu, void* data), void* data)
 {
 	me->inspector = ins;
 	me->inspectorData = data;
+}
+
+bool Cpu_GetPerformIns(Cpu* me)
+{
+	return me->performNextIns;
 }
 
 Cpu* Cpu_Create(Mem* mem)
@@ -219,7 +224,6 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		#define OP_SET(_o, _v) (reg[_o] ? *reg[_o] = (_v): Mem_Write32(me->mem, pv[_o], (_v)))
 		
 		if(me->performNextIns){ 
-			//me->ins[ins](me, pv[0], pv[1]);
 			uint32_t tmp, op[2] = {0};
 			for(int i = 0; i < numOps; i++){
 				op[i] = OP_GET(i);
@@ -242,7 +246,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 
 				case DI_Sub:
 					tmp = op[0] = OP_GET(0);
-					op[0] -= OP_GET(1);
+					OP_SET(0, op[0] -= OP_GET(1));
 					me->o = op[0] > tmp;
 					me->cycles += 2;
 					break;
@@ -328,6 +332,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 				case DI_Ifg:
 					me->performNextIns = op[0] > op[1];
 					me->cycles += 2 + (uint32_t)me->performNextIns;
+					//LogD("IFG %x %x -> perform: %d", op[0], op[1], me->performNextIns);
 					break;
 
 				case DI_Ifb:

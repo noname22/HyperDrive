@@ -1,5 +1,6 @@
 #define LDEBUG
 #include <stdlib.h>
+#include <string.h>
 
 #include "vdp.h"
 #include "mem.h"
@@ -14,9 +15,9 @@ struct Vdp {
 };
 
 typedef struct {
-	uint32_t mode, w, h, tileset, palette, data;
+	uint32_t mode, tileset, palette, data;
 	uint32_t palSize, dataSize, tilesetSize;
-	int32_t  x, y;
+	int32_t  x, y, w, h;
 	uint8_t* tilesetPtr, *dataPtr, *palPtr;
 } VLayer;
 
@@ -37,12 +38,15 @@ Vdp* Vdp_Create(Mem* mem, int w, int h, uint8_t* vMem)
 void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 {
 	// Bitmap mode
+	px -= 3;
 	for(int x = 0; x < me->w; x++){
-		int xx = x + layer->x;
+		px += 3;
+
+		int xx = x - layer->x;
 		if(xx < 0) continue;
 		if(xx >= layer->w) break;
 
-		int yy = me->y + layer->y;
+		int yy = me->y - layer->y;
 		if(yy < 0) continue;
 		if(yy >= layer->h) break;
 
@@ -51,15 +55,17 @@ void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 
 		uint8_t spx = layer->dataPtr[idx];
 		
-		*(px++) = layer->palPtr[(spx * 3 + 2) % layer->palSize];
-		*(px++) = layer->palPtr[(spx * 3 + 1) % layer->palSize];
-		*(px++) = layer->palPtr[(spx * 3) % layer->palSize];
+		*(px + 0) = layer->palPtr[(spx * 3 + 2) % layer->palSize];
+		*(px + 1) = layer->palPtr[(spx * 3 + 1) % layer->palSize];
+		*(px + 2) = layer->palPtr[(spx * 3) % layer->palSize];
 	}
 }
 
 bool Vdp_HandleScanLine(Vdp* me)
 {
 	static bool once = false;
+	memset(me->p, 0, 3 * me->w);
+
 	for(int i = 0; i < 8; i++){
 		uint8_t* px = me->p;
 		VLayer layer;

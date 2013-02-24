@@ -41,10 +41,12 @@ int Start(Settings* settings)
 
 	bool done = false;
 
-	HyperMachine* hm = HM_Create(w, h, px, settings->debugFile != NULL);
+	HyperMachine* hm = HM_Create(w, h, px, settings->debugFile != NULL, settings->freq);
 	LAssert(HM_LoadRom(hm, settings->file, settings->debugFile), "bailing");
 
 	while(!done){
+		int timer = SDL_GetTicks();
+
 		SDL_Event event;
 		while(SDL_PollEvent(&event)){
 			if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)){
@@ -73,7 +75,12 @@ int Start(Settings* settings)
 
 		SDL_BlitSurface(scaleSurface, NULL, screen, NULL);
 		SDL_Flip(screen);
-		SDL_Delay(10);
+
+		int frameTime = SDL_GetTicks() - timer;
+
+		if(frameTime < 16){
+			SDL_Delay(16 - frameTime);
+		}
 	}
 
 	return 0;
@@ -87,7 +94,7 @@ int main(int argc, char** argv)
 	Settings settings;
 	memset(&settings, 0, sizeof(Settings));
 
-	settings.freq = 7000;
+	settings.freq = 8000000;
 
 	bool debugging = false;
 
@@ -105,10 +112,10 @@ int main(int argc, char** argv)
 				LogI("Available flags:");
 				LogI("  -vX   set log level, where X is [0-5] - default: 2");
 				LogI("  -d    start with debugger");
-				LogI("  -fF   interpret at frequency F in MHz - default 7.0 MHz, 0.0 = as fast as possible");
+				LogI("  -fF   interpret at frequency F in MHz - default 8.0 MHz");
 				return 0;
 			}
-			else if(sscanf(v, "-f%f", &fFreq) == 1){ settings.freq = (int)(fFreq * 1000.0f); }
+			else if(sscanf(v, "-f%f", &fFreq) == 1){ settings.freq = (int)(fFreq * 1000000.0f); }
 			else if(sscanf(v, "-v%d", &logLevel) == 1){}
 			else if(!strcmp(v, "-d")){ debugging = true; }
 			else{
