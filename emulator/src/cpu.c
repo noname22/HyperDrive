@@ -149,7 +149,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 	me->cycles = 0;
 	if(me->wait) return 0;
 
-	#define READ8 MEM_READ8(me->mem, me->pc); me->pc ++;
+	#define READ8 MEM_READ8(me->mem, me->pc); me->pc++;
 	#define READ16 MEM_READ16(me->mem, me->pc); me->pc += 2;
 	#define READ32 MEM_READ32(me->mem, me->pc); me->pc += 4;
 
@@ -187,6 +187,8 @@ int Cpu_Execute(Cpu* me, int execCycles)
 			LogD("  op %d: %s", i + 1, dvalNames[v[i]]);
 			
 			if((OpHasNextWord(v[i]))){
+				LogD("%u", me->pc);
+				LogD("%x", MEM_READ32(me->mem, me->pc));
 				val[i] = READ32;
 				LogD("  NW: %08x", val[i]);
 			}

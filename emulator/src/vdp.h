@@ -6,8 +6,9 @@
 
 typedef struct Vdp Vdp;
 typedef struct Mem Mem;
+typedef struct Cpu Cpu;
 
-Vdp* Vdp_Create(Mem* mem, int w, int h, uint8_t* vMem);
+Vdp* Vdp_Create(Cpu* cpu, Mem* mem, int w, int h, uint8_t* vMem);
 bool Vdp_HandleScanLine(Vdp* me);
 
 #endif

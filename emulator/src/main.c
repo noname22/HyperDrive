@@ -1,4 +1,4 @@
-#define LDEBUG
+//#define LDEBUG
 #ifndef WIN32
 #include <signal.h>
 #endif

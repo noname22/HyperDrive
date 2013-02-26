@@ -35,13 +35,13 @@ Mem* Mem_Create();
 #define MEM_FROMLE32(__v) __v
 #define MEM_FROMLE16(__v) __v
 
-#define MEM_READ32(_mem, _addr) (MEM_FROMLE32(*MEM_READ_PTR((_mem), (_addr))))
-#define MEM_READ16(_mem, _addr) (MEM_FROMLE16(*MEM_READ_PTR((_mem), (_addr))))
+#define MEM_READ32(_mem, _addr) (MEM_FROMLE32(*(uint32_t*)MEM_READ_PTR((_mem), (_addr))))
+#define MEM_READ16(_mem, _addr) (MEM_FROMLE16(*(uint16_t*)MEM_READ_PTR((_mem), (_addr))))
 #define MEM_READ8(_mem, _addr)  (*MEM_READ_PTR(_mem, (_addr)))
 
 #define MEM_WRITE8(_mem, _addr, _v) (*(MEM_WRITE_PTR((_mem), (_addr))) = _v)
-#define MEM_WRITE16(_mem, _addr, _v) (*(MEM_WRITE_PTR((_mem), (_addr))) = MEM_TOLE16(_v))
-#define MEM_WRITE32(_mem, _addr, _v) (*(MEM_WRITE_PTR((_mem), (_addr))) = MEM_TOLE32(_v))
+#define MEM_WRITE16(_mem, _addr, _v) (*((uint16_t*)MEM_WRITE_PTR((_mem), (_addr))) = MEM_TOLE16(_v))
+#define MEM_WRITE32(_mem, _addr, _v) (*(uint32_t*)(MEM_WRITE_PTR((_mem), (_addr))) = MEM_TOLE32(_v))
 
 bool Mem_SetROM(Mem* me, uint8_t* rom, uint32_t size);
 

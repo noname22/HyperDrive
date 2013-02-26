@@ -3,9 +3,14 @@
 .DEFINE VDP_Y    0x300010C
 
 :start
+; ==== Set up hblank and vblank interrupt vector ====
+	SET [0x3000000], hblank 
+	SET [0x3000004], vblank 
+
+; ==== Initialize VDP                            ====
 	SET A, VDP_BASE
 	
-	; Layer mode
+	; Layer mode 1, bitmap
 	SET [A], 1
 	ADD A, 4
 
@@ -37,40 +42,43 @@
 	SET [A], bitmap
 	ADD A, 4
 
-	; Halt
-	; SYS 0
 
-	SET X, 1
-	;SET Y, 1
+; ==== Initialize sintab index registers       ====
+
+	SET X, 0
+	SET Z, 0
+
+; ==== Loop and halt the CPU                   ====
+;         (interrupts will keep waking it up)
 
 :loop
-	IFG [0x300010C], 192
-		SET X, -1
-
-	IFE [0x300010C], 0
-		SET X, 1
-
-	ADD [0x300010C], X
-	
-	;IFG [0x3000110], 112
-	;	SET Y, -1
-
-	;IFE [0x3000110], 0
-	;	SET Y, 1
-
-	;ADD [0x3000110], Y
-
-	SET C, 100
-:wait
-	SUB C, 1
-	IFN C, 0
-		SET PC, wait
-
-	;SET PUSH, msg
-	;SYS 1
-
+	SYS 0
 	SET PC, loop
+
+:vblank
+	ADD Z, 8       ; increase index into the sintab
+		       ; that X gets reset to (to create the wave effect)
+
+	SET X, Z       ; reset the index into the sintab to Z
+	SET PC, POP
+
+:hblank
+	MOD X, 1024    ; make sure the index stays within the sintab
+
+	; Set the VDP X and Y position registers to the sintab value
+	; Plus the width/height of the bitmap - width/height of the screen / 2
+
+	SET [0x300010C], [sintab+x]
+	ADD [0x300010C], 96
+	
+	SET [0x3000110], [sintab+x]
+	ADD [0x3000110], 56
+	
+	ADD X, 4
+
+	SET PC, POP
 
 :bitmap .INCBIN "bear.dat"
 :pal    .INCBIN "bear.pal"
-:msg    .DW "Hello", 10, 0
+:sintab .INCBIN "sintab.dat"
+:msg    .DW "Hblank", 10, 0

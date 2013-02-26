@@ -382,7 +382,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			continue;
 		}
 		
-		LAssert(toknum - 1 == InsNumOps(insnum), "%s expects %d operands (not %d)", dinsNames[insnum], InsNumOps(insnum), toknum - 1);
+		LAssertError(toknum - 1 == InsNumOps(insnum), "%s expects %d operands (not %d)", dinsNames[insnum], InsNumOps(insnum), toknum - 1);
 
 		// Write to output
 

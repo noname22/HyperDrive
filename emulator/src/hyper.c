@@ -37,7 +37,7 @@ HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug, int freq)
 
 	me->mem = Mem_Create();
 	me->cpu = Cpu_Create(me->mem);
-	me->vdp = Vdp_Create(me->mem, w, h, display);
+	me->vdp = Vdp_Create(me->cpu, me->mem, w, h, display);
 
 	me->insPerScanLine = (int)((float)freq / 60.0 / (float)h);
 
