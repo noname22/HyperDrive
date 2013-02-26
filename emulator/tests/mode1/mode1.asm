@@ -7,63 +7,63 @@
 
 start:
 	; ==== Set up hblank and vblank interrupt vector ====
-	set [IRQ_HBLANK], hblank 
-	set [IRQ_VBLANK], vblank 
+	set.l [IRQ_HBLANK], hblank 
+	set.l [IRQ_VBLANK], vblank 
 
 	; ==== Initialize VDP                            ====
-	set a, VDP_BASE
+	set.l a, VDP_BASE
 	
 	; Layer mode 1, bitmap
-	set [a], 1
+	set.l [a], 1
 	add a, 4
 
 	; Width
-	set [a], 128
+	set.l [a], 128
 	add a, 4
 	
 	; Height
-	set [a], 128
+	set.l [a], 128
 	add a, 4
 	
 	; X
-	set [a], 0
+	set.l [a], 0
 	add a, 4
 	
 	; Y
-	set [a], 56
+	set.l [a], 56
 	add a, 4
 
 	; Tileset (not used)
-	set [a], 0
+	set.l [a], 0
 	add a, 4
 	
 	; Palette
-	set [a], pal
+	set.l [a], pal
 	add a, 4
 
 	; Bitmap data
-	set [a], bitmap
+	set.l [a], bitmap
 	add a, 4
 
 
 	; ==== Initialize sintab index registers       ====
 
-	set x, 0
-	set z, 0
+	set.l x, 0
+	set.l z, 0
 
 	; ==== Loop and halt the CPU                   ====
 	;         (interrupts will keep waking it up)
 
 loop:
 	sys 0
-	set pc, loop
+	set.l pc, loop
 
 vblank:
 	add z, 8       ; increase index into the sintab
-		       ; that X gets reset to (to create the wave effect)
+		       ; that X gets reset.l to (to create the wave effect)
 
-	set x, z       ; reset the index into the sintab to Z
-	set pc, pop
+	set.l x, z       ; reset.l the index into the sintab to Z
+	set.l pc, pop
 
 hblank:
 	mod x, 1024    ; make sure the index stays within the sintab
@@ -71,15 +71,15 @@ hblank:
 	; Set the VDP X and Y position registers to the sintab value
 	; Plus the width/height of the bitmap - width/height of the screen / 2
 
-	set [VDP_X], [sintab+x]
+	set.l [VDP_X], [sintab+x]
 	add [VDP_X], 96
 	
-	set [VDP_Y], [sintab+x]
+	set.l [VDP_Y], [sintab+x]
 	add [VDP_Y], 56
 	
 	add x, 4
 
-	set pc, pop
+	set.l pc, pop
 
 bitmap: .incbin "bear.dat"
 pal:    .incbin "bear.pal"

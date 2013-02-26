@@ -6,15 +6,18 @@ typedef enum {
 	DI_Jsr, DI_Sys,
 
 	// instructions with 2 operands
-	DI_Set, DI_Add, DI_Sub, DI_Mul, DI_Div, DI_Mod, DI_Shl, 
+	DI_Setl, DI_Setw, DI_Setb,
+	DI_Add, DI_Sub, DI_Mul, DI_Div, DI_Mod, DI_Shl, 
 	DI_Shr, DI_And, DI_Bor, DI_Xor, DI_Ife, DI_Ifn, DI_Ifg, DI_Ifb,
 } DIns;
 
 #define DINS_NUM (DI_Ifb + 1)
 #define DINS_1OP_BASE DI_Jsr
-#define DINS_2OP_BASE DI_Set
+#define DINS_2OP_BASE DI_Setl
 
-#define DINSNAMES {"jsr", "sys", "set", "add", "sub", "mul", "div", "mod", "shl", "shr", \
+#define DINSNAMES {"jsr", "sys", \
+	"set.l", "set.w", "set.b", \
+	"add", "sub", "mul", "div", "mod", "shl", "shr", \
 	"and", "bor", "xor", "ife", "ifn", "ifg", "ifb"}
 
 // Value encoding

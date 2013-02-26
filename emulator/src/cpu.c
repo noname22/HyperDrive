@@ -221,9 +221,12 @@ int Cpu_Execute(Cpu* me, int execCycles)
 
 		// Sets or gets the data the operand is referring to. Either a register or a memory address.
 		// _o is the zero indexed operand number
-
+		
 		#define OP_GET(_o) (reg[_o] ? *reg[_o] : MEM_READ32(me->mem, pv[_o]))
+
 		#define OP_SET(_o, _v) (reg[_o] ? *reg[_o] = (_v): MEM_WRITE32(me->mem, pv[_o], (_v)))
+		#define OP_SET16(_o, _v) (reg[_o] ? *reg[_o] = (_v): MEM_WRITE16(me->mem, pv[_o], (_v)))
+		#define OP_SET8(_o, _v) (reg[_o] ? *reg[_o] = (_v): MEM_WRITE8(me->mem, pv[_o], (_v)))
 		
 		if(me->performNextIns){ 
 			uint32_t tmp, op[2] = {0};
@@ -232,8 +235,18 @@ int Cpu_Execute(Cpu* me, int execCycles)
 			}
 
 			switch(ins){
-				case DI_Set: 
+				case DI_Setl: 
 					OP_SET(0, op[1]);
+					me->cycles++; 
+					break;
+
+				case DI_Setw: 
+					OP_SET16(0, op[1]);
+					me->cycles++; 
+					break;
+
+				case DI_Setb: 
+					OP_SET8(0, op[1]);
 					me->cycles++; 
 					break;
 
