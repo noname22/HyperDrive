@@ -16,9 +16,18 @@ struct Vdp {
 	Cpu* cpu;
 };
 
+typedef enum {
+	VB_Replace,
+	VB_Add,
+	VB_Subtract
+} Vdp_BlendMode;
+
+
 typedef struct {
 	uint32_t mode, tileset, palette, data;
 	int32_t  x, y, w, h;
+	uint8_t colorKey;
+	Vdp_BlendMode blendMode;
 } VLayer;
 
 Vdp* Vdp_Create(Cpu* cpu, Mem* mem, int w, int h, uint8_t* vMem)
@@ -36,35 +45,69 @@ Vdp* Vdp_Create(Cpu* cpu, Mem* mem, int w, int h, uint8_t* vMem)
 	return me;
 }
 
+#define VMAX(_x, _y) (_y) ^ (((_x) ^ (_y)) & -((_x) < (_y)))
+#define VMIN(_x, _y) (_x) ^ (((_x) ^ (_y)) & -((_x) < (_y)))
+
 void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 {
 	// Bitmap mode
-	px -= 3;
 	for(int x = 0; x < me->w; x++){
-		px += 3;
-
 		int xx = x - layer->x;
-		if(xx < 0) continue;
-		if(xx >= layer->w) break;
+		if(xx < 0)
+			goto no_draw;
+
+		if(xx >= layer->w)
+			break;
 
 		int yy = me->y - layer->y;
-		if(yy < 0) continue;
-		if(yy >= layer->h) break;
+		if(yy < 0)
+			goto no_draw;
+
+		if(yy >= layer->h)
+			break;
 
 		int idx = xx + yy * layer->w;
-		if(idx >= MEM_SIZE) continue;
+		if(idx >= MEM_SIZE)
+			goto no_draw;
 
-		uint8_t spx = MEM_READ8(me->mem, layer->data + idx) * 3;
+		int spx = MEM_READ8(me->mem, layer->data + idx) * 3;
+		if(spx == layer->colorKey)
+			goto no_draw;
 		
-		*(px + 0) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
-		*(px + 1) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
-		*(px + 2) = *MEM_READ_PTR(me->mem, layer->palette + spx);
+		switch(layer->blendMode){
+			case VB_Replace:
+				*(px++) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
+				*(px++) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
+				*(px++) = *MEM_READ_PTR(me->mem, layer->palette + spx);
+				break;
+			case VB_Add:
+				*(px) = VMIN((int)*px + *MEM_READ_PTR(me->mem, layer->palette + spx), 255);
+				px++; spx++;
+				*(px) = VMIN((int)*px + *MEM_READ_PTR(me->mem, layer->palette + spx), 255);
+				px++; spx++;
+				*(px) = VMIN((int)*px + *MEM_READ_PTR(me->mem, layer->palette + spx), 255);
+				px++; spx++;
+
+				break;
+
+			case VB_Subtract:
+				*(px) = VMAX((int)*px - *MEM_READ_PTR(me->mem, layer->palette + spx), 0);
+				px++; spx++;
+				*(px) = VMAX((int)*px - *MEM_READ_PTR(me->mem, layer->palette + spx), 0);
+				px++; spx++;
+				*(px) = VMAX((int)*px - *MEM_READ_PTR(me->mem, layer->palette + spx), 0);
+				px++; spx++;
+				break;
+		}
+		continue;
+		no_draw:
+		px += 3;
 	}
 }
 
 bool Vdp_HandleScanLine(Vdp* me)
 {
-	static bool once = false;
+	static bool once[8] = {false};
 	memset(me->p, 0, 3 * me->w);
 
 	for(int i = 0; i < 8; i++){
@@ -87,15 +130,20 @@ bool Vdp_HandleScanLine(Vdp* me)
 		layer.palette = MEM_READ32(me->mem, lAddr); lAddr += 4;
 		layer.data = MEM_READ32(me->mem, lAddr); lAddr += 4;
 
-		if(!once){
-			LogD("layer:   %d", i);
-			LogD("mode:    %d", layer.mode);
-			LogD("w, h:    %d, %d", layer.w, layer.h);
-			LogD("x, y:    %d, %d", layer.x, layer.y);
-			LogD("tileset: %08x", layer.tileset);
-			LogD("palette: %08x", layer.palette);
-			LogD("data:    %08x", layer.data);
-			once = true;
+		layer.colorKey = MEM_READ8(me->mem, lAddr); lAddr++;
+		layer.blendMode = MEM_READ8(me->mem, lAddr); lAddr++;
+
+		if(!once[i]){
+			LogD("layer:     %d", i);
+			LogD("mode:      %d", layer.mode);
+			LogD("w, h:      %d, %d", layer.w, layer.h);
+			LogD("x, y:      %d, %d", layer.x, layer.y);
+			LogD("tileset:   %08x", layer.tileset);
+			LogD("palette:   %08x", layer.palette);
+			LogD("data:      %08x", layer.data);
+			LogD("color key: %02x", layer.colorKey);
+			LogD("blend mode: %02x", layer.blendMode);
+			once[i] = true;
 		}
 
 		Vdp_LayerMode1ScanLine(me, &layer, px);
