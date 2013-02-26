@@ -56,9 +56,9 @@ void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 
 		uint8_t spx = MEM_READ8(me->mem, layer->data + idx) * 3;
 		
-		*(px + 2) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
+		*(px + 0) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
 		*(px + 1) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
-		*(px + 0) = *MEM_READ_PTR(me->mem, layer->palette + spx);
+		*(px + 2) = *MEM_READ_PTR(me->mem, layer->palette + spx);
 	}
 }
 

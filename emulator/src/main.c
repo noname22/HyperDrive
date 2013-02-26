@@ -1,5 +1,5 @@
 //#define LDEBUG
-#ifndef WIN32
+#ifdef __linux
 #include <signal.h>
 #endif
 
@@ -18,6 +18,8 @@ typedef struct {
 	int freq;
 	const char* file;
 	const char* debugFile;
+	const char* videoFile;
+	int numRecFrames;
 } Settings;
 
 int Start(Settings* settings)
@@ -25,9 +27,16 @@ int Start(Settings* settings)
 	SDL_Init(SDL_INIT_EVERYTHING);
 
         // Disable ctrl-c catching on linux
-	#ifndef WIN32
+	#ifdef __linux
         signal(SIGINT, SIG_DFL);
 	#endif
+
+	FILE* videoFile = NULL;
+	int frame = 0;
+	if(settings->videoFile){
+		LAssert((videoFile = fopen(settings->videoFile, "w")), "could not open video file for writing");
+		LogI("Recording video output to file: %s", settings->videoFile);
+	}
 
 	const int w = 320, h = 240, mult = 3;
 
@@ -38,7 +47,7 @@ int Start(Settings* settings)
 
 	// Upscaled display
 	uint8_t* spx = calloc(1, w * h * mult * mult * 3);
-	SDL_Surface* scaleSurface = SDL_CreateRGBSurfaceFrom(spx, w * mult, h * mult, 24, w * 3 * mult, 0xff0000, 0xff00, 0xff, 0);
+	SDL_Surface* scaleSurface = SDL_CreateRGBSurfaceFrom(spx, w * mult, h * mult, 24, w * 3 * mult, 0xff, 0xff00, 0xff0000, 0);
 	//SDL_Surface* origSurface = SDL_CreateRGBSurfaceFrom(px, w, h, 24, w * 3, 0xff0000, 0xff00, 0xff, 0);
 
 	bool done = false;
@@ -56,13 +65,18 @@ int Start(Settings* settings)
 			}
 		}
 
-		int t = SDL_GetTicks();
+		//int t = SDL_GetTicks();
 		HM_Tick(hm);
-		LogD("HM_Tick: %d", SDL_GetTicks() - t);
+		//LogD("HM_Tick: %d", SDL_GetTicks() - t);
+
+		if(videoFile){
+			if(settings->numRecFrames == 0 || frame++ < settings->numRecFrames)
+				fwrite(px, w * h * 3, 1, videoFile);
+		}
 
 		// scale mult times
 		
-		t = SDL_GetTicks();
+		//t = SDL_GetTicks();
 		uint8_t* tp = spx, *sp = px;
 		for(int y = 0; y < h; y++){
 			for(int j = 0; j < mult; j++){
@@ -78,9 +92,10 @@ int Start(Settings* settings)
 			}
 			sp += w * 3;
 		}
-		LogD("scale: %d", SDL_GetTicks() - t);
+		//LogD("scale: %d", SDL_GetTicks() - t);
 
 		//SDL_BlitSurface(origSurface, NULL, screen, NULL);
+
 		SDL_BlitSurface(scaleSurface, NULL, screen, NULL);
 		SDL_Flip(screen);
 
@@ -91,6 +106,9 @@ int Start(Settings* settings)
 			SDL_Delay(16 - frameTime);
 		}
 	}
+
+	if(videoFile)
+		fclose(videoFile);
 
 	return 0;
 }
@@ -111,6 +129,7 @@ int main(int argc, char** argv)
 	
 	int numFiles = 0;
 	float fFreq;
+	char videoFile[1024] = {0};
 
 	for(int i = 1; i < argc; i++){
 		char* v = argv[i];
@@ -121,11 +140,15 @@ int main(int argc, char** argv)
 				LogI("Available flags:");
 				LogI("  -vX   set log level, where X is [0-5] - default: 2");
 				LogI("  -d    start with debugger");
+				LogI("  -rV   record video (raw RGB888, 320x240), where V is the output file");
+				LogI("  -lF   limit number of frames to record to F - default: 0 = infinite");
 				LogI("  -fF   interpret at frequency F in MHz - default 8.0 MHz");
 				return 0;
 			}
 			else if(sscanf(v, "-f%f", &fFreq) == 1){ settings.freq = (int)(fFreq * 1000000.0f); }
 			else if(sscanf(v, "-v%d", &logLevel) == 1){}
+			else if(sscanf(v, "-l%d", &settings.numRecFrames) == 1){}
+			else if(sscanf(v, "-r%1023s", videoFile) == 1){ settings.videoFile = videoFile; }
 			else if(!strcmp(v, "-d")){ debugging = true; }
 			else{
 				LogF("No such flag: %s", v);
