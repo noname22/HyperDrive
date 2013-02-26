@@ -1,84 +1,87 @@
-.DEFINE VDP_BASE 0x3000100
-.DEFINE VDP_X    0x3000108
-.DEFINE VDP_Y    0x300010C
+.const VDP_BASE 0x3000100
+.const VDP_X    0x300010C
+.const VDP_Y    0x3000110
+
+.const IRQ_HBLANK 0x3000000
+.const IRQ_VBLANK 0x3000004
 
 :start
 ; ==== Set up hblank and vblank interrupt vector ====
-	SET [0x3000000], hblank 
-	SET [0x3000004], vblank 
+	set [IRQ_HBLANK], hblank 
+	set [IRQ_VBLANK], vblank 
 
 ; ==== Initialize VDP                            ====
-	SET A, VDP_BASE
+	set a, VDP_BASE
 	
 	; Layer mode 1, bitmap
-	SET [A], 1
-	ADD A, 4
+	set [a], 1
+	add a, 4
 
 	; Width
-	SET [A], 128
-	ADD A, 4
+	set [a], 128
+	add a, 4
 	
 	; Height
-	SET [A], 128
-	ADD A, 4
+	set [a], 128
+	add a, 4
 	
 	; X
-	SET [A], 0
-	ADD A, 4
+	set [a], 0
+	add a, 4
 	
 	; Y
-	SET [A], 56
-	ADD A, 4
+	set [a], 56
+	add a, 4
 
 	; Tileset (not used)
-	SET [A], 0
-	ADD A, 4
+	set [a], 0
+	add a, 4
 	
 	; Palette
-	SET [A], pal
-	ADD A, 4
+	set [a], pal
+	add a, 4
 
 	; Bitmap data
-	SET [A], bitmap
-	ADD A, 4
+	set [a], bitmap
+	add a, 4
 
 
 ; ==== Initialize sintab index registers       ====
 
-	SET X, 0
-	SET Z, 0
+	set x, 0
+	set z, 0
 
 ; ==== Loop and halt the CPU                   ====
 ;         (interrupts will keep waking it up)
 
 :loop
-	SYS 0
-	SET PC, loop
+	sys 0
+	set pc, loop
 
 :vblank
-	ADD Z, 8       ; increase index into the sintab
+	add z, 8       ; increase index into the sintab
 		       ; that X gets reset to (to create the wave effect)
 
-	SET X, Z       ; reset the index into the sintab to Z
-	SET PC, POP
+	set x, z       ; reset the index into the sintab to Z
+	set pc, pop
 
 :hblank
-	MOD X, 1024    ; make sure the index stays within the sintab
+	mod x, 1024    ; make sure the index stays within the sintab
 
 	; Set the VDP X and Y position registers to the sintab value
 	; Plus the width/height of the bitmap - width/height of the screen / 2
 
-	SET [0x300010C], [sintab+x]
-	ADD [0x300010C], 96
+	set [VDP_X], [sintab+x]
+	add [VDP_X], 96
 	
-	SET [0x3000110], [sintab+x]
-	ADD [0x3000110], 56
+	set [VDP_Y], [sintab+x]
+	add [VDP_Y], 56
 	
-	ADD X, 4
+	add x, 4
 
-	SET PC, POP
+	set pc, pop
 
-:bitmap .INCBIN "bear.dat"
-:pal    .INCBIN "bear.pal"
-:sintab .INCBIN "sintab.dat"
-:msg    .DW "Hblank", 10, 0
+:bitmap .incbin "bear.dat"
+:pal    .incbin "bear.pal"
+:sintab .incbin "sintab.dat"
+:msg    .dw "Hblank", 10, 0

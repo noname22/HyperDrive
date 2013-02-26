@@ -47,7 +47,7 @@ void Disasm(uint8_t* ram, uint32_t start)
 			
 			LogD("op: %d", op);
 			char str[64];
-			n += printf("%s", StrReplace(str, valNames[op], "NW", numStr));
+			n += printf("%s", StrReplace(str, valNames[op], "nw", numStr));
 
 			if(i < InsNumOps(ins) - 1)
 				n += printf(", ");

@@ -19,9 +19,6 @@ Hasm* Hasm_Create()
 	
 	me->labels = Labels_Create();
 
-	me->defines = calloc(1, sizeof(Defines));
-	Vector_Init(*me->defines, Define);
-
 	return me;
 }
 

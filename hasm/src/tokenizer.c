@@ -54,12 +54,12 @@ char* GetToken(Hasm* me, char* line, char* token)
 
 	// TODO this is broken, eg. [MY_DEFINE] doesn't work
 	// Handle defines	
-	Define* it;
+	/*Define* it;
 	Vector_ForEach(*me->defines, it){
 		if(!strcmp(token, it->searchReplace[0])){
 			strcpy(token, it->searchReplace[1]);
 		}
-	}
+	}*/
 
 	return line;
 }

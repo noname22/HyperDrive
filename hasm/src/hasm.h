@@ -9,7 +9,6 @@
 
 extern int logLevel;
 
-typedef struct Define_vec_s Defines;
 typedef struct Label_vec_s Labels;
 
 typedef struct {
@@ -21,7 +20,6 @@ typedef struct {
 
 	uint32_t endAddr;
 
-	Defines* defines;
 	Labels* labels;
 
 	FILE* debugFile;

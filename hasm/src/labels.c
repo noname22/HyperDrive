@@ -4,11 +4,8 @@
 
 bool IsRelative(const char* s)
 {
-	char tmp[strlen(REL) + 1];
-	tmp[0] = 0;
-	strncat(tmp, s, strlen(REL));
-	for(int i = 0; i < strlen(REL); i++) tmp[i] = tolower(tmp[i]);
-	return !strncmp(tmp, REL, strlen(REL));
+	if(strlen(s) < strlen(REL)) return false;
+	return !strncmp(s, REL, strlen(REL));
 }
 
 const char* GetName(const char* s)
@@ -40,7 +37,7 @@ Label* Labels_Add(Labels* me, const char* label)
 	label = GetName(label);
 	
 	// XXX: Why do I have two duplicate lable checks?
-	LAssert(Labels_Lookup(me, label) == NULL, "duplicate label: %s", label);
+	LAssert(Labels_Lookup(me, label) == NULL, "duplicate label/constant: %s", label);
 
 	Label l;
 	memset(&l, 0, sizeof(Label));
@@ -56,12 +53,13 @@ Label* Labels_Add(Labels* me, const char* label)
 void Labels_Define(Labels* lme, Hasm* me, const char* label, uint32_t address, const char* filename, int lineNumber)
 {
 	label = GetName(label);
+	LogD("defining label: %s", label);
 
 	Label* l = Labels_Lookup(lme, label);
 	if(!l) l = Labels_Add(lme, label);
 	else 
 		LAssertError(!l->found, 
-			"duplicate label: %s, first defined at %s:%d", 
+			"duplicate label/constant: %s, first defined at %s:%d", 
 			label, l->filename, l->lineNumber);
 
 	l->addr = address;
@@ -100,7 +98,7 @@ void Labels_Replace(Labels* me, uint8_t* ram)
 	Label* l;
 	Vector_ForEach(*me, l){
 		if(!l->found){
-			LogF("No such label: %s", l->label);
+			LogF("No such label/constant: %s", l->label);
 			LogI("Referenced from:");
 
 			LabelRef* ref;
@@ -127,5 +125,3 @@ void Labels_Replace(Labels* me, uint8_t* ram)
 		}
 	}
 }
-
-

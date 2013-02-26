@@ -8,9 +8,9 @@ static const char* valNames[] = VALNAMES;
 #define AD2INS(_n) (-2 - (_n))
 #define INS2AD(_n) (-(_n) - 2)
 
-typedef enum                           { AD_Org, AD_Define, AD_Reserve, AD_Fill, AD_IncBin, AD_Include, AD_Macro, AD_End, AD_Dat, AD_Dw } AsmDir;
-static const char* adNames[AD_NUM] =   { ".ORG", ".DEFINE", ".RESERVE", ".FILL", ".INCBIN", ".INCLUDE",  "MACRO", "END", "DAT",  ".DW"  };
-int                adNumArgs[AD_NUM] = {    1,       2,         1,         2,        1,          1,         -1,     0,     -1,    -1    };
+typedef enum                           { AD_Org, AD_Const, AD_Reserve, AD_Fill, AD_IncBin, AD_Include, AD_Macro, AD_End, AD_Dat, AD_Dw } AsmDir;
+static const char* adNames[AD_NUM] =   { ".org", ".const", ".reserve", ".fill", ".incbin", ".include",  "macro", "end", "dat",  ".dw"  };
+int                adNumArgs[AD_NUM] = {    1,       2,        1,         2,        1,          1,         -1,     0,     -1,    -1    };
 
 bool StrEmpty(const char* str)
 {
@@ -25,7 +25,6 @@ char* LStrip(char* str)
 }
 
 // XXX: make ParseLiteral complain about garbage after the literal
-// XXX: support signed/negative values
 uint32_t ParseLiteral(Hasm* me, const char* str, bool* success, bool failOnError)
 {
 	unsigned lit = 0xaaaa;
@@ -36,6 +35,12 @@ uint32_t ParseLiteral(Hasm* me, const char* str, bool* success, bool failOnError
 		//LAssertError(lit < 0x10000, "Literal number must be in range 0 - 65535 (0xFFFF)");
 		if(success) *success = true;
 		return lit;
+	}
+
+	int sLit = 0;
+	if(sscanf(str, "%d", &sLit) == 1){
+		if(success) *success = true;
+		return (uint32_t)sLit;
 	}
 
 	LAssertError(!failOnError, "could not parse literal: %s", str)
@@ -72,8 +77,6 @@ DVals ParseOperand(Hasm* me, const char* tok, unsigned int* nextWord, char** lab
 	char c;
 	char token[MAX_STR_SIZE];
 	strcpy(token, tok);
-
-	for(int i = 0; i < strlen(token); i++) token[i] = tolower(token[i]);
 
 	LogD("parsing operand: %s", tok);
 
@@ -222,12 +225,12 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 		done = GetLine(me, in, line);
 
 		int insnum = -1;
-		Define def;
 
 		int numOperands = 0;
 		uint8_t operands[2] = {0, 0};
 		uint32_t nextWord[2] = {0, 0};
 		char* opLabels[2] = {NULL, NULL};
+		char* constName;
 
 		uint16_t tmp = 0;
 		
@@ -242,9 +245,6 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			if(StrEmpty(token)) break;
 
 			//LogD("token: '%s'", token);
-
-			char tokenUpper[MAX_STR_SIZE];
-			for(int i = 0; i < strlen(token) + 1; i++) tokenUpper[i] = toupper(token[i]);
 
 			// A label, add it and continue	
 			if(toknum == 0 && STARTSWITH(token, ':')) {
@@ -297,9 +297,16 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 				}
 		
 				// .DEFINE
-				else if(ad == AD_Define){	
-					def.searchReplace[toknum - 1] = strdup(token);
-					if(toknum == 2) Vector_Add(*me->defines, def); 
+				else if(ad == AD_Const){	
+					//def.searchReplace[toknum - 1] = strdup(token);
+					//if(toknum == 2) Vector_Add(*me->defines, def); 
+					if(toknum == 1)
+						constName = strdup(token);
+
+					if(toknum == 2){
+						Labels_Define(me->labels, me, constName, ParseLiteral(me, token, NULL, true), me->currentFile, me->lineNumber);
+						free(constName);
+					}
 				}	
 
 				// .FILL
@@ -342,7 +349,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 
 				// Assembly directives
 				for(int i = 0; i < AD_NUM; i++){
-					if(!strcmp(adNames[i], tokenUpper)){
+					if(!strcmp(adNames[i], token)){
 						LogD("Directive: %s", token);
 						insnum = AD2INS(i);
 						goto done_searching;
@@ -351,13 +358,13 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 
 				// Actual instructions
 				for(int i = 0; i < DINS_NUM; i++){
-					if(!strcmp(dinsNames[i], tokenUpper)) {
+					if(!strcmp(dinsNames[i], token)) {
 						insnum = i;
 						goto done_searching;
 					}
 				}
 
-				LAssertError(insnum != -1, "no such instruction: %s", token);
+				LAssertError(insnum != -1, "no such instruction or directive: %s", token);
 
 				done_searching: 
 				while(0){} // "NOOP", must have something after a label

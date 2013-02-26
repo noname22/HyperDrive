@@ -14,8 +14,8 @@ typedef enum {
 #define DINS_1OP_BASE DI_Jsr
 #define DINS_2OP_BASE DI_Set
 
-#define DINSNAMES {"JSR", "SYS", "SET", "ADD", "SUB", "MUL", "DIV", "MOD", "SHL", "SHR", \
-	"AND", "BOR", "XOR", "IFE", "IFN", "IFG", "IFB"}
+#define DINSNAMES {"jsr", "sys", "set", "add", "sub", "mul", "div", "mod", "shl", "shr", \
+	"and", "bor", "xor", "ife", "ifn", "ifg", "ifb"}
 
 // Value encoding
 typedef enum {
@@ -31,13 +31,13 @@ typedef enum {
 #define DVALS_NUM (DV_NextWord + 1)
 
 #define VALNAMES {\
-	"A", "B", "C", "X", "Y", "Z", "I", "J",\
-	"[A]", "[B]", "[C]", "[X]", "[Y]", "[Z]", "[I]", "[J]",\
-	"[NW+A]", "[NW+B]", "[NW+C]", "[NW+X]", "[NW+Y]", "[NW+Z]", "[NW+I]", "[NW+J]",\
-	"POP", "PEEK", "PUSH",\
-	"SP", "PC",\
-	"O",\
-	"[NW]", "NW"\
+	"a", "b", "c", "x", "y", "z", "i", "j",\
+	"[a]", "[b]", "[c]", "[x]", "[y]", "[z]", "[i]", "[j]",\
+	"[nw+a]", "[nw+b]", "[nw+c]", "[nw+x]", "[nw+y]", "[nw+z]", "[nw+i]", "[nw+j]",\
+	"pop", "peek", "push",\
+	"sp", "pc",\
+	"o",\
+	"[nw]", "nw"\
 }
 
 #endif
