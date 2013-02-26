@@ -247,8 +247,9 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			//LogD("token: '%s'", token);
 
 			// A label, add it and continue	
-			if(toknum == 0 && STARTSWITH(token, ':')) {
-				Labels_Define(me->labels, me, token + 1, addr, me->currentFile, me->lineNumber);
+			if(toknum == 0 && ENDSWITH(token, ':')) {
+				token[strlen(token) - 1] = 0;
+				Labels_Define(me->labels, me, token, addr, me->currentFile, me->lineNumber);
 				labelsAdded++;
 				continue;
 			}

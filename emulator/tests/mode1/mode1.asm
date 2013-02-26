@@ -5,12 +5,12 @@
 .const IRQ_HBLANK 0x3000000
 .const IRQ_VBLANK 0x3000004
 
-:start
-; ==== Set up hblank and vblank interrupt vector ====
+start:
+	; ==== Set up hblank and vblank interrupt vector ====
 	set [IRQ_HBLANK], hblank 
 	set [IRQ_VBLANK], vblank 
 
-; ==== Initialize VDP                            ====
+	; ==== Initialize VDP                            ====
 	set a, VDP_BASE
 	
 	; Layer mode 1, bitmap
@@ -46,26 +46,26 @@
 	add a, 4
 
 
-; ==== Initialize sintab index registers       ====
+	; ==== Initialize sintab index registers       ====
 
 	set x, 0
 	set z, 0
 
-; ==== Loop and halt the CPU                   ====
-;         (interrupts will keep waking it up)
+	; ==== Loop and halt the CPU                   ====
+	;         (interrupts will keep waking it up)
 
-:loop
+loop:
 	sys 0
 	set pc, loop
 
-:vblank
+vblank:
 	add z, 8       ; increase index into the sintab
 		       ; that X gets reset to (to create the wave effect)
 
 	set x, z       ; reset the index into the sintab to Z
 	set pc, pop
 
-:hblank
+hblank:
 	mod x, 1024    ; make sure the index stays within the sintab
 
 	; Set the VDP X and Y position registers to the sintab value
@@ -81,7 +81,6 @@
 
 	set pc, pop
 
-:bitmap .incbin "bear.dat"
-:pal    .incbin "bear.pal"
-:sintab .incbin "sintab.dat"
-:msg    .dw "Hblank", 10, 0
+bitmap: .incbin "bear.dat"
+pal:    .incbin "bear.pal"
+sintab: .incbin "sintab.dat"
