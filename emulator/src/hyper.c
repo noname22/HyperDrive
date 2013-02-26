@@ -25,7 +25,7 @@ void HM_SysWrite(Cpu* cpu, void* data)
 	HyperMachine* me = data;
 	uint32_t addr = Cpu_Pop(cpu);
 	char c;
-	while((c = Mem_Read8(me->mem, addr++))){
+	while((c = MEM_READ8(me->mem, addr++))){
 		fputc(c, stdout);
 	}
 }

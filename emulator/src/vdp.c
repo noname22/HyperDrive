@@ -16,9 +16,7 @@ struct Vdp {
 
 typedef struct {
 	uint32_t mode, tileset, palette, data;
-	uint32_t palSize, dataSize, tilesetSize;
 	int32_t  x, y, w, h;
-	uint8_t* tilesetPtr, *dataPtr, *palPtr;
 } VLayer;
 
 Vdp* Vdp_Create(Mem* mem, int w, int h, uint8_t* vMem)
@@ -30,7 +28,7 @@ Vdp* Vdp_Create(Mem* mem, int w, int h, uint8_t* vMem)
 	me->h = h;
 	me->vMem = vMem;
 	me->p = vMem;
-	me->mem = mem;
+	me->mem = (Mem*)mem;
 
 	return me;
 }
@@ -51,13 +49,13 @@ void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 		if(yy >= layer->h) break;
 
 		int idx = xx + yy * layer->w;
-		if(idx >= layer->dataSize) continue;
+		if(idx >= MEM_SIZE) continue;
 
-		uint8_t spx = layer->dataPtr[idx];
+		uint8_t spx = MEM_READ8(me->mem, layer->data + idx * 3);
 		
-		*(px + 0) = layer->palPtr[(spx * 3 + 2) % layer->palSize];
-		*(px + 1) = layer->palPtr[(spx * 3 + 1) % layer->palSize];
-		*(px + 2) = layer->palPtr[(spx * 3) % layer->palSize];
+		*(px + 0) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
+		*(px + 1) = *MEM_READ_PTR(me->mem, layer->palette + spx++);
+		*(px + 2) = *MEM_READ_PTR(me->mem, layer->palette + spx);
 	}
 }
 
@@ -72,24 +70,20 @@ bool Vdp_HandleScanLine(Vdp* me)
 
 		uint32_t lAddr = MEM_VDP_BASE + i * 8 * 4;
 
-		layer.mode = Mem_Read32(me->mem, lAddr); lAddr += 4;
+		layer.mode = MEM_READ32(me->mem, lAddr); lAddr += 4;
 
 		if(!layer.mode) continue;
 
-		layer.w = Mem_Read32(me->mem, lAddr); lAddr += 4;
-		layer.h = Mem_Read32(me->mem, lAddr); lAddr += 4;
+		layer.w = MEM_READ32(me->mem, lAddr); lAddr += 4;
+		layer.h = MEM_READ32(me->mem, lAddr); lAddr += 4;
 		
-		layer.x = Mem_Read32(me->mem, lAddr); lAddr += 4;
-		layer.y = Mem_Read32(me->mem, lAddr); lAddr += 4;
+		layer.x = MEM_READ32(me->mem, lAddr); lAddr += 4;
+		layer.y = MEM_READ32(me->mem, lAddr); lAddr += 4;
 
-		layer.tileset = Mem_Read32(me->mem, lAddr); lAddr += 4;
-		layer.palette = Mem_Read32(me->mem, lAddr); lAddr += 4;
-		layer.data = Mem_Read32(me->mem, lAddr); lAddr += 4;
+		layer.tileset = MEM_READ32(me->mem, lAddr); lAddr += 4;
+		layer.palette = MEM_READ32(me->mem, lAddr); lAddr += 4;
+		layer.data = MEM_READ32(me->mem, lAddr); lAddr += 4;
 
-		layer.tilesetPtr = Mem_GetPtr(me->mem, layer.tileset, &layer.tilesetSize);
-		layer.palPtr = Mem_GetPtr(me->mem, layer.palette, &layer.palSize);
-		layer.dataPtr = Mem_GetPtr(me->mem, layer.data, &layer.dataSize);
-		
 		if(!once){
 			LogD("layer:   %d", i);
 			LogD("mode:    %d", layer.mode);

@@ -2,6 +2,7 @@
 #include "log.h"
 #include "cvector.h"
 
+// XXX: THIS IS WRONG
 // Memory Map
 //   0x00000000 - 0x3FFFFFFF ROM, mirrored
 //   0x40000000 - 0x7FFFFFFF RAM, mirrored 
@@ -9,148 +10,26 @@
 //        +0x00 - 0x1F       Interrupt vectors
 //    ---------------- VDP ------------------
 //        +0x20 - 0x40       8 tile layers
-
-#define MEM_MASK 0x3FFFFFFF
-
-typedef struct {
-	Mem_RegisterCb onRead;
-	Mem_RegisterCb onWrite;
-	void* data;
-} Mem_Register;
-
-struct Mem {
-	uint8_t* rom;
-	uint32_t romMask;
-	uint32_t romSize;
-	
-	uint8_t* ram;
-	uint32_t ramMask;
-	uint32_t ramSize;
-
-	uint8_t* regs;
-	uint32_t regMask;
-	uint32_t regSize;
-
-	Mem_Register* regCb;
-};
+// XXX: THIS IS WRONG
 
 Mem* Mem_Create()
 {
 	Mem* me = calloc(1, sizeof(Mem));
 	LAssert(me, "could not allocate ram for mem");
 
-	me->romSize = 1024 * 1024 * 16;
-	me->rom = calloc(1, me->romSize);
-	LAssert(me->rom, "could not allocate ram for vm rom");
-	me->romMask = me->romSize - 1;
-
-	me->ramSize = 1024 * 1024 * 2;
-	me->ram = calloc(1, me->ramSize);
-	LAssert(me->ram, "could not allocate ram for vm ram");
-	me->ramMask = me->ramSize - 1;
-	
-	me->regSize = 1024;
-	me->regs = calloc(1, me->regSize);
-	LAssert(me->regs, "could not allocate ram for vm hw regs");
-	me->regMask = me->regSize - 1;
-
-	me->regCb = calloc(1, me->regSize * sizeof(Mem_Register));
-	LAssert(me->regCb, "could not allocate ram for vm hw reg callbacks");
+	me->mem = calloc(1, MEM_SIZE + 3);
+	// + 3 because if a 32 bit word is written to the last address it should be a valid write
+	LAssert(me->mem, "could not allocate ram for vm memory");
 
 	return me;
 }
 
 bool Mem_SetROM(Mem* me, uint8_t* rom, uint32_t size)
 {
-	memset(me->rom, 0, me->romSize);
-	// XXX check, realocate, etc
-	memcpy(me->rom, rom, size);
+	if(size > MEM_RAM_BASE)
+		return false;
+
+	memset(me->mem, 0, MEM_SIZE + 3);
+	memcpy(me->mem, rom, size);
 	return true;
-}
-
-uint32_t Mem_GetBOS(Mem* me)
-{
-	// really returns BOS + 1
-	return MEM_RAM_BASE + me->ramSize;
-}
-
-void Mem_Write8(Mem* me, uint32_t addr, uint8_t val)
-{
-	uint32_t idx;
-	switch(addr >> 30){
-		case 0: me->rom[addr & me->romMask] = val; break; // ROM
-		case 1: me->ram[(addr & MEM_MASK) & me->ramMask] = val; break; // RAM
-		default:
-			// hw register
-			idx = (addr & MEM_MASK) & me->regMask;
-			me->regs[idx] = val; break;
-			if(me->regCb[idx].onWrite) 
-				me->regCb[idx].onWrite(me, addr, me->regs + idx, true, me->regCb[idx].data);
-	}
-}
-
-void Mem_Write16(Mem* me, uint32_t addr, uint16_t val)
-{
-	// Write LSB last to trigger any register callback on the base address
-	// when the rest of the value has been written
-	Mem_Write8(me, addr + 1, val >> 8);
-	Mem_Write8(me, addr, val & 0xff);
-}
-
-void Mem_Write32(Mem* me, uint32_t addr, uint32_t val)
-{
-	// Order as Write16
-	Mem_Write8(me, addr + 3, (val >> 24) & 0xff);
-	Mem_Write8(me, addr + 2, (val >> 16) & 0xff);
-	Mem_Write8(me, addr + 1, (val >> 8) & 0xff);
-	Mem_Write8(me, addr, val & 0xff);
-}
-
-uint8_t Mem_Read8(Mem* me, uint32_t addr)
-{
-	uint32_t idx;
-	switch(addr >> 30){
-		case 0: return me->rom[addr & me->romMask]; // ROM
-		case 1: return me->ram[(addr & MEM_MASK) & me->ramMask]; // RAM
-		default:
-			// hw register
-			idx = (addr & MEM_MASK) & me->regMask;
-			if(me->regCb[idx].onRead) 
-				me->regCb[idx].onRead(me, addr, me->regs + idx, false, me->regCb[idx].data);
-			return me->regs[idx];
-	}
-}
-
-uint16_t Mem_Read16(Mem* me, uint32_t addr)
-{
-	return Mem_Read8(me, addr) | (Mem_Read8(me, addr + 1) << 8);
-}
-
-uint32_t Mem_Read32(Mem* me, uint32_t addr)
-{
-	return Mem_Read8(me, addr) | (Mem_Read8(me, addr + 1) << 8) | (Mem_Read8(me, addr + 2) << 16) | (Mem_Read8(me, addr + 3) << 24);
-}
-
-uint8_t* Mem_GetPtr(Mem* me, uint32_t addr, uint32_t* size)
-{
-	uint32_t idx;
-	switch(addr >> 30){
-		case 0: 
-			// ROM
-			idx = addr & me->romMask;
-			*size = me->romSize - idx;
-			return me->rom + idx;
-
-		case 1: 
-			// RAM
-			idx = addr & me->ramMask;
-			*size = me->ramSize - idx;
-			return me->ram + idx; 
-
-		default:
-			// hw register
-			idx = (addr & MEM_MASK) & me->regMask;
-			*size = me->regSize - idx;
-			return me->regs + idx;
-	}
 }

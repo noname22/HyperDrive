@@ -388,14 +388,14 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 			if(what == -1){
 				unsigned addr = 0;
 				if(sscanf(argv[i], "0x%x", &addr) == 1 || sscanf(argv[i], "%u", &addr)){
-					printf("[0x%08x]: 0x%02x\n", addr, Mem_Read8(me->mem, addr));
+					printf("[0x%08x]: 0x%02x\n", addr, MEM_READ8(me->mem, addr));
 				}
 
 				else{
 					DebugSymbol* s = Debug_GetDebugSymbolByItem(me, argv[i]);
 
 					if(s){
-						printf("[%s (0x%08x)]: 0x%02x\n", argv[i], s->addr, Mem_Read8(me->mem, s->addr));
+						printf("[%s (0x%08x)]: 0x%02x\n", argv[i], s->addr, MEM_READ8(me->mem, s->addr));
 					}
 					else printf("I don't know what a '%s' is\n", argv[i]);
 				}
@@ -414,8 +414,8 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 				uint32_t sp = Cpu_GetRegister(cpu, DR_SP);
 
 				if(sp){
-					for(int i = Mem_GetBOS(me->mem); i >= sp; i--){
-						printf("  0x%08x\n", Mem_Read32(me->mem, i));
+					for(int i = MEM_BOS; i >= sp; i--){
+						printf("  0x%08x\n", MEM_READ32(me->mem, i));
 					}
 				}else printf("  (empty)\n");
 			}
@@ -424,7 +424,7 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 				unsigned addr;
 				if(sscanf(argv[i], "@0x%x", &addr) == 1 || sscanf(argv[i], "@%u", &addr) == 1){
 					printf("[%08x] 8/0x%02x 16/0x%04x 32/0x%08x\n", 
-						addr, Mem_Read8(me->mem, addr), Mem_Read16(me->mem, addr), Mem_Read32(me->mem, addr));
+						addr, MEM_READ8(me->mem, addr), MEM_READ16(me->mem, addr), MEM_READ32(me->mem, addr));
 				}else{
 					printf("could not parse address %s", argv[i]);
 				}

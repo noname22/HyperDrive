@@ -4,32 +4,45 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct Mem Mem;
+#define MEM_SIZE (64 * 1024 * 1024)
+#define MEM_ROM_MASK 0x1FFFFFF
+#define MEM_RAM_MASK 0x2000000
+#define MEM_MASK (MEM_SIZE - 1)
 
-typedef void (*Mem_RegisterCb)(Mem* me, uint32_t addr, uint8_t* reg, bool write, void* data);
-
-Mem* Mem_Create();
-
-uint8_t* Mem_GetPtr(Mem* me, uint32_t addr, uint32_t* max);
-
-void Mem_Write8(Mem* me, uint32_t addr, uint8_t val);
-void Mem_Write16(Mem* me, uint32_t addr, uint16_t val);
-void Mem_Write32(Mem* me, uint32_t addr, uint32_t val);
-
-uint8_t Mem_Read8(Mem* me, uint32_t addr);
-uint16_t Mem_Read16(Mem* me, uint32_t addr);
-uint32_t Mem_Read32(Mem* me, uint32_t addr);
-
-uint32_t Mem_GetBOS(Mem* me);
-bool Mem_SetROM(Mem* me, uint8_t* rom, uint32_t size);
+#define MEM_BOS      0x3000000
 
 #define MEM_ROM_BASE 0
-#define MEM_RAM_BASE 0x40000000 
-#define MEM_REG_BASE 0x80000000
+#define MEM_RAM_BASE 0x2000000 
+#define MEM_REG_BASE 0x3000000
 
 // Interrupt vector table
 #define MEM_IVT_BASE MEM_REG_BASE
-#define MEM_VDP_BASE (MEM_REG_BASE + 0x20)
+#define MEM_VDP_BASE (MEM_REG_BASE + 0x100)
 
+typedef struct Mem Mem;
+struct Mem {
+	uint8_t* mem;
+};
+
+Mem* Mem_Create();
+
+#define MEM_READ_PTR(_mem, _addr) (((_mem)->mem) + ((_addr) & MEM_MASK))
+#define MEM_WRITE_PTR(_mem, _addr) (((_mem)->mem) + (((_addr) | MEM_RAM_MASK) & MEM_MASK))
+
+// XXX fix big endian systems
+#define MEM_TOLE32(__v) __v
+#define MEM_TOLE16(__v) __v
+#define MEM_FROMLE32(__v) __v
+#define MEM_FROMLE16(__v) __v
+
+#define MEM_READ32(_mem, _addr) (MEM_FROMLE32(*MEM_READ_PTR((_mem), (_addr))))
+#define MEM_READ16(_mem, _addr) (MEM_FROMLE16(*MEM_READ_PTR((_mem), (_addr))))
+#define MEM_READ8(_mem, _addr)  (*MEM_READ_PTR(_mem, (_addr)))
+
+#define MEM_WRITE8(_mem, _addr, _v) (*(MEM_WRITE_PTR((_mem), (_addr))) = _v)
+#define MEM_WRITE16(_mem, _addr, _v) (*(MEM_WRITE_PTR((_mem), (_addr))) = MEM_TOLE16(_v))
+#define MEM_WRITE32(_mem, _addr, _v) (*(MEM_WRITE_PTR((_mem), (_addr))) = MEM_TOLE32(_v))
+
+bool Mem_SetROM(Mem* me, uint8_t* rom, uint32_t size);
 
 #endif

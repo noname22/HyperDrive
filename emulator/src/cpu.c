@@ -51,7 +51,7 @@ bool Cpu_GetExit(Cpu* me)
 }
 
 uint32_t Cpu_Pop(Cpu* me) { 
-	uint32_t ret = Mem_Read32(me->mem, me->sp);
+	uint32_t ret = MEM_READ32(me->mem, me->sp);
 	me->sp += 4;
 	return ret;
 }
@@ -59,7 +59,7 @@ uint32_t Cpu_Pop(Cpu* me) {
 void Cpu_Push(Cpu* me, uint32_t v){
 	LogD("pushing: %u", v);
 	me->sp -= 4;
-	Mem_Write32(me->mem, me->sp, v);
+	MEM_WRITE32(me->mem, me->sp, v);
 }
 
 void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* cpu, void* data), void* data)
@@ -77,7 +77,7 @@ Cpu* Cpu_Create(Mem* mem)
 {
 	Cpu* me = calloc(1, sizeof(Cpu));
 	me->mem = mem;
-	me->sp = Mem_GetBOS(mem);
+	me->sp = MEM_BOS;
 	me->performNextIns = true;
 
 	Vector_Init(me->sysCalls, SysCall);
@@ -116,7 +116,7 @@ void Cpu_SetRegister(Cpu* me, Cpu_Register reg, uint32_t val)
 
 void Cpu_Interrupt(Cpu* me, int num)
 {
-	uint32_t vec = Mem_Read32(me->mem, MEM_IVT_BASE + num * 4);
+	uint32_t vec = MEM_READ32(me->mem, MEM_IVT_BASE + num * 4);
 	if(vec == 0) return;
 
 	Cpu_Push(me, me->pc);
@@ -135,9 +135,9 @@ void Cpu_DumpState(Cpu* me)
 	LogD(" ");
 	LogD("Stack: ");
 
-	if(me->sp == Mem_GetBOS(me->mem)){
-		for(int i = Mem_GetBOS(me->mem) - 1; i >= me->sp; i -= 4){
-			LogD("  0x%08x: 0x%08x", i, Mem_Read32(me->mem, i));
+	if(me->sp == MEM_BOS){
+		for(int i = MEM_BOS - 1; i >= me->sp; i -= 4){
+			LogD("  0x%08x: 0x%08x", i, MEM_READ32(me->mem, i));
 		}
 	}else LogD("  (empty)");
 	LogD(" ");
@@ -149,9 +149,9 @@ int Cpu_Execute(Cpu* me, int execCycles)
 	me->cycles = 0;
 	if(me->wait) return 0;
 
-	#define READ8 Mem_Read8(me->mem, me->pc); me->pc ++;
-	#define READ16 Mem_Read16(me->mem, me->pc); me->pc += 2;
-	#define READ32 Mem_Read32(me->mem, me->pc); me->pc += 4;
+	#define READ8 MEM_READ8(me->mem, me->pc); me->pc ++;
+	#define READ16 MEM_READ16(me->mem, me->pc); me->pc += 2;
+	#define READ32 MEM_READ32(me->mem, me->pc); me->pc += 4;
 
 	while(me->cycles < execCycles && !me->wait){
 		if(me->inspector) me->inspector(me, me->inspectorData);
@@ -220,8 +220,8 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		// Sets or gets the data the operand is referring to. Either a register or a memory address.
 		// _o is the zero indexed operand number
 
-		#define OP_GET(_o) (reg[_o] ? *reg[_o] : Mem_Read32(me->mem, pv[_o]))
-		#define OP_SET(_o, _v) (reg[_o] ? *reg[_o] = (_v): Mem_Write32(me->mem, pv[_o], (_v)))
+		#define OP_GET(_o) (reg[_o] ? *reg[_o] : MEM_READ32(me->mem, pv[_o]))
+		#define OP_SET(_o, _v) (reg[_o] ? *reg[_o] = (_v): MEM_WRITE32(me->mem, pv[_o], (_v)))
 		
 		if(me->performNextIns){ 
 			uint32_t tmp, op[2] = {0};

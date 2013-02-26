@@ -1,3 +1,4 @@
+#define LDEBUG
 #ifndef WIN32
 #include <signal.h>
 #endif
@@ -38,6 +39,7 @@ int Start(Settings* settings)
 	// Upscaled display
 	uint8_t* spx = calloc(1, w * h * mult * mult * 3);
 	SDL_Surface* scaleSurface = SDL_CreateRGBSurfaceFrom(spx, w * mult, h * mult, 24, w * 3 * mult, 0xff0000, 0xff00, 0xff, 0);
+	//SDL_Surface* origSurface = SDL_CreateRGBSurfaceFrom(px, w, h, 24, w * 3, 0xff0000, 0xff00, 0xff, 0);
 
 	bool done = false;
 
@@ -54,9 +56,13 @@ int Start(Settings* settings)
 			}
 		}
 
+		int t = SDL_GetTicks();
 		HM_Tick(hm);
+		LogD("HM_Tick: %d", SDL_GetTicks() - t);
 
 		// scale mult times
+		
+		t = SDL_GetTicks();
 		uint8_t* tp = spx, *sp = px;
 		for(int y = 0; y < h; y++){
 			for(int j = 0; j < mult; j++){
@@ -72,13 +78,16 @@ int Start(Settings* settings)
 			}
 			sp += w * 3;
 		}
+		LogD("scale: %d", SDL_GetTicks() - t);
 
+		//SDL_BlitSurface(origSurface, NULL, screen, NULL);
 		SDL_BlitSurface(scaleSurface, NULL, screen, NULL);
 		SDL_Flip(screen);
 
 		int frameTime = SDL_GetTicks() - timer;
 
 		if(frameTime < 16){
+			LogD("frametime: %d", frameTime);
 			SDL_Delay(16 - frameTime);
 		}
 	}
