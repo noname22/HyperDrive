@@ -1,4 +1,4 @@
 name      hyperdrive
-cflags    std=c99 ggdb Wall I../common O3
+cflags    std=c99 ggdb Wall I../common Isrc/hw Isrc/ui
 lib       sdl
 sourcedir src ../common

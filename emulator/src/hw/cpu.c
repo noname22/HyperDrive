@@ -33,7 +33,7 @@ struct Cpu {
 	int cycles;
 
 	SysCallVector sysCalls;
-	void (*inspector)(Cpu* dcpu, void* data);
+	bool (*inspector)(Cpu* cpu, void* data);
 	void* inspectorData;
 };
 
@@ -62,7 +62,7 @@ void Cpu_Push(Cpu* me, uint32_t v){
 	MEM_WRITE32(me->mem, me->sp, v);
 }
 
-void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* cpu, void* data), void* data)
+void Cpu_SetInspector(Cpu* me, bool (*ins)(Cpu* cpu, void* data), void* data)
 {
 	me->inspector = ins;
 	me->inspectorData = data;
@@ -147,14 +147,17 @@ void Cpu_DumpState(Cpu* me)
 int Cpu_Execute(Cpu* me, int execCycles)
 {
 	me->cycles = 0;
-	if(me->wait) return 0;
 
 	#define READ8 MEM_READ8(me->mem, me->pc); me->pc++;
 	#define READ16 MEM_READ16(me->mem, me->pc); me->pc += 2;
 	#define READ32 MEM_READ32(me->mem, me->pc); me->pc += 4;
 
 	while(me->cycles < execCycles && !me->wait){
-		if(me->inspector) me->inspector(me, me->inspectorData);
+		if(me->inspector){
+			if(!me->inspector(me, me->inspectorData)){
+				return me->cycles;
+			}
+		}
 
 		#ifdef LDEBUG
 		uint32_t addr = me->pc;
@@ -393,9 +396,11 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		/*char bb[1024];
 		gets(bb);
 		Cpu_DumpState(me);*/
-
-		if(me->exit) return 0;
 	}
 
-	return 1;
+	// the CPU waits execCycles, while the VDP continues
+	if(me->wait)
+		return execCycles;
+
+	return me->cycles;
 }

@@ -8,8 +8,16 @@ typedef enum {
 	// instructions with 2 operands
 	DI_Setl, DI_Setw, DI_Setb,
 	DI_Add, DI_Sub, DI_Mul, DI_Div, DI_Mod, DI_Shl, 
-	DI_Shr, DI_And, DI_Bor, DI_Xor, DI_Ife, DI_Ifn, DI_Ifg, DI_Ifb,
+	DI_Shr, DI_And, DI_Bor, DI_Xor, 
+	
+	DI_Ife, DI_Ifn, DI_Ifg, DI_Ifb,
 } DIns;
+
+// Remember to modify this when adding new instructions
+// Should evaluate to true if the given instruction 
+// modifies its target (ie. operand 0)
+
+#define DINS_MODS_TARGET(_i) ((_i) >= DI_Setl && (_i) <= DI_Xor)
 
 #define DINS_NUM (DI_Ifb + 1)
 #define DINS_1OP_BASE DI_Jsr

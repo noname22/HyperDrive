@@ -30,6 +30,6 @@ void Cpu_Interrupt(Cpu* me, int num);
 bool Cpu_GetPerformIns(Cpu* me);
 
 /* Something to be called before executing each instruction */
-void Cpu_SetInspector(Cpu* me, void (*ins)(Cpu* cpu, void* data), void* data);
+void Cpu_SetInspector(Cpu* me, bool (*ins)(Cpu* cpu, void* data), void* data);
 
 #endif

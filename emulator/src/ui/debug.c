@@ -7,7 +7,7 @@
 
 #include <stdlib.h>
 	
-#define RAssert(__v, ...) if(!(__v)){ printf(__VA_ARGS__); return; }
+#define RAssert(__v, ...) if(!(__v)){ DPRINT(__VA_ARGS__); return; }
 
 typedef char* CharPtr;
 
@@ -52,41 +52,26 @@ struct Debug {
 	DebugSymbolVec debugSymbols;
 	BreakPointVec breakPoints;
 
+	void (*Print)(Debug* me, void* data, const char* format, ...);
+	void* printData;
+
 	bool showNextIns;
+	bool running;
 };
+
+#define DPRINT(...) me->Print(me, me->printData, __VA_ARGS__)
 
 static const char unknown[] = "(\?\?\?\?)";
 
-// damned signals, there goes my global-less design
-static Debug* sDebug = NULL;
-
-void HandleBreak()
-{
-	if(sDebug->runInstructions == 0) printf("\ntype 'quit' to quit\n");
-	else printf("\nbreak\n");
-	sDebug->runInstructions = 0;
+void Debug_DefaultPrintHandler(Debug* me, void* data, const char* format, ...){
+	LogW("no print handler set for debugger");
 }
 
-#ifndef WIN32
-// Unix signal handler
-
-#include <signal.h>
-void signalHandler(int signal){ HandleBreak(); }
-
-#else
-
-// Windows signal handler
-
-#define WIN32_LEAN_AND_MEAN
-#define WIN32_EXTRA_LEAN
-#include <windows.h>
-
-BOOL WINAPI ConsoleHandler(DWORD CEvent)
+void Debug_SetPrintfHandler(Debug* me, void (*fun)(Debug* me, void* data, const char* format, ...), void* data)
 {
-	if(CEvent == CTRL_C_EVENT || CEvent == CTRL_BREAK_EVENT) HandleBreak();
+	me->Print = fun;
+	me->printData = data;
 }
-
-#endif
 
 SourceFile* Debug_GetSourceFileByName(Debug* me, const char* filename)
 {
@@ -111,6 +96,11 @@ DebugSymbol* Debug_GetDebugSymbolByItem(Debug* me, const char* item)
 	}
 
 	return NULL;
+}
+
+bool Debug_GetRunning(Debug* me)
+{
+	return me->running;
 }
 
 const char* SourceFile_GetLine(SourceFile* me, int line)
@@ -162,7 +152,7 @@ bool Debug_AddBreakPointItem(Debug* me, const char* item)
 bool Debug_RemoveBreakPoint(Debug* me, int index)
 {
 	if(index < me->breakPoints.count){
-		Vector_Remove(me->breakPoints, index);
+		Vector_Remove(me->breakPoints, index, 1);
 		return true;
 	}
 	return false;
@@ -171,7 +161,7 @@ bool Debug_RemoveBreakPoint(Debug* me, int index)
 void Debug_PrintBreakPoint(Debug* me, BreakPoint* bp)
 {
 	const char* onoff[] = {"disabled", "enabled"};
-	printf("0x%08x %s", bp->addr, onoff[bp->enabled]);
+	DPRINT("0x%08x %s", bp->addr, onoff[bp->enabled]);
 }
 
 bool Debug_EnableBreakPoint(Debug* me, int index, bool enabled)
@@ -195,29 +185,30 @@ DebugSymbol* GetSymbolFromAddress(Debug* me, uint32_t addr)
 	return NULL;
 }
 
-void Debug_Inspector(Cpu* cpu, void* vme)
+void Debug_Break(Debug* me)
 {
-	if(!Cpu_GetPerformIns(cpu))
-		return;
+	me->running = false;
+}
 
-	Debug* me = vme;
-	me->insExec++;
-	bool done = false;
+void Debug_Continue(Debug* me)
+{
+	me->running = true;
+}
 
+void Debug_HandleInput(Debug* me, const char* text)
+{
+	Cpu* cpu = me->cpu;
+	char input[512];
+	strncpy(input, text, sizeof(input));
 	
 	BreakPoint* bit;
 	Vector_ForEach(me->breakPoints, bit){
 		if(Cpu_GetRegister(cpu, DR_PC) == bit->addr && bit->enabled){
-			printf("hit breakpoint: ");
-			Debug_PrintBreakPoint(vme, bit);
-			printf("\n");
+			DPRINT("hit breakpoint: ");
+			Debug_PrintBreakPoint(me, bit);
+			DPRINT("\n");
 			me->runInstructions = 0;
 		}
-	}
-
-	if(me->runInstructions != 0){
-		if(me->runInstructions > 0) me->runInstructions--;
-		return;
 	}
 
 	typedef struct {
@@ -228,6 +219,8 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 	} Command;
 
 	// XXX get rid of the nested functions. It's a GCC extension, not C99.
+
+	bool done = false;
 
 	void Continue(int argc, char** argv){
 		if(argc == 1){
@@ -248,7 +241,7 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 	{
 		if(Cpu_GetRegister(cpu, DR_PC) != 0 && !Cpu_GetExit(cpu)){
 			char buffer[8];
-			printf("program already running, restart? (y/n) ");
+			DPRINT("program already running, restart? (y/n) ");
 			if(fgets(buffer, sizeof(buffer), stdin) == NULL)
 				return;
 
@@ -266,11 +259,11 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 		uint32_t addr = Cpu_GetRegister(cpu, DR_PC);
 		DebugSymbol* s = GetSymbolFromAddress(me, addr);
 		if(!s){
-			printf("0x%04x: unknown\n", addr);
+			DPRINT("0x%04x: unknown\n", addr);
 			return;
 		}
 		
-		printf("%08x (%08x-%08x) %s:%d %s\n", 
+		DPRINT("%08x (%08x-%08x) %s:%d %s\n", 
 			addr, s->addr, s->addr + s->length,s->sourceFile->filename, s->line, 
 			SourceFile_GetLine(s->sourceFile, s->line));
 	}
@@ -288,13 +281,13 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 
 		void AddBreakPointAddr(uint32_t addr){
 			Debug_AddBreakPointAddr(me, addr);
-			printf("added breakpoint at address 0x%08x\n", addr);
+			DPRINT("added breakpoint at address 0x%08x\n", addr);
 		}
 
 		void AddBreakPointLine(const char* filename, int line){
 			RAssert(Debug_AddBreakPointLine(me, filename, line),
 				"could not locate line %d of file '%s' in debug symbols\n", line, filename);
-			printf("added breakpoint at %s:%d\n", filename, line);
+			DPRINT("added breakpoint at %s:%d\n", filename, line);
 		}
 
 		if(!strcmp(argv[1], "add")){
@@ -328,38 +321,38 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 			else{
 				RAssert(Debug_AddBreakPointItem(me, argv[2]), 
 					"could not locate function/label '%s' in any of the source files\n", argv[2]);
-				printf("added breakpoint at function/label '%s'\n", argv[2]);
+				DPRINT("added breakpoint at function/label '%s'\n", argv[2]);
 			}
 		}
 
 		else if(!strcmp(argv[1], "remove")){
 			RAssert( Debug_RemoveBreakPoint(me, atoi(argv[2])), "invalid index\n");
-			printf("removed breakpoint: %d\n", atoi(argv[2]));
+			DPRINT("removed breakpoint: %d\n", atoi(argv[2]));
 		}
 
 		else if(!strcmp(argv[1], "enable")){
 			RAssert( Debug_EnableBreakPoint(me, atoi(argv[2]), true), "invalid index\n");
-			printf("enabled breakpoint: %d\n", atoi(argv[2]));
+			DPRINT("enabled breakpoint: %d\n", atoi(argv[2]));
 		}
 
 		else if(!strcmp(argv[1], "disable")){
 			RAssert( Debug_EnableBreakPoint(me, atoi(argv[2]), false), "invalid index\n");
-			printf("disabled breakpoint: %d\n", atoi(argv[2]));
+			DPRINT("disabled breakpoint: %d\n", atoi(argv[2]));
 		}
 
 		else if(!strcmp(argv[1], "list")){
-			printf("  current breakpoints:\n");
+			DPRINT("  current breakpoints:\n");
 			BreakPoint* it;
 			int i = 0;
 			Vector_ForEach(me->breakPoints, it){
-				printf("    %2d. ", i++);
+				DPRINT("    %2d. ", i++);
 				Debug_PrintBreakPoint(me, it);
-				printf("\n");
+				DPRINT("\n");
 			}
 		}
 
 		else {
-			printf("no such breakpoint action: '%s', see help", argv[1]);
+			DPRINT("no such breakpoint action: '%s', see help", argv[1]);
 		}
 	}
 
@@ -388,25 +381,25 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 			if(what == -1){
 				unsigned addr = 0;
 				if(sscanf(argv[i], "0x%x", &addr) == 1 || sscanf(argv[i], "%u", &addr)){
-					printf("[0x%08x]: 0x%02x\n", addr, MEM_READ8(me->mem, addr));
+					DPRINT("[0x%08x]: 0x%02x\n", addr, MEM_READ8(me->mem, addr));
 				}
 
 				else{
 					DebugSymbol* s = Debug_GetDebugSymbolByItem(me, argv[i]);
 
 					if(s){
-						printf("[%s (0x%08x)]: 0x%02x\n", argv[i], s->addr, MEM_READ8(me->mem, s->addr));
+						DPRINT("[%s (0x%08x)]: 0x%02x\n", argv[i], s->addr, MEM_READ8(me->mem, s->addr));
 					}
-					else printf("I don't know what a '%s' is\n", argv[i]);
+					else DPRINT("I don't know what a '%s' is\n", argv[i]);
 				}
 			}
 
-			if(what >= 0) printf("%s: 0x%08x\n", argv[i], Cpu_GetRegister(cpu, what));
+			if(what >= 0) DPRINT("%s: 0x%08x\n", argv[i], Cpu_GetRegister(cpu, what));
 
 			// regs
 			else if(what == -2){
-				for(int i = 0; i <= DR_O; i++) printf("%s: 0x%08x ", printables[i].what, Cpu_GetRegister(cpu, i));
-				printf("\n");
+				for(int i = 0; i <= DR_O; i++) DPRINT("%s: 0x%08x ", printables[i].what, Cpu_GetRegister(cpu, i));
+				DPRINT("\n");
 			}
 
 			// stack
@@ -415,18 +408,18 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 
 				if(sp){
 					for(int i = MEM_BOS; i >= sp; i--){
-						printf("  0x%08x\n", MEM_READ32(me->mem, i));
+						DPRINT("  0x%08x\n", MEM_READ32(me->mem, i));
 					}
-				}else printf("  (empty)\n");
+				}else DPRINT("  (empty)\n");
 			}
 
 			else if(what == -4){
 				unsigned addr;
 				if(sscanf(argv[i], "@0x%x", &addr) == 1 || sscanf(argv[i], "@%u", &addr) == 1){
-					printf("[%08x] 8/0x%02x 16/0x%04x 32/0x%08x\n", 
+					DPRINT("[%08x] 8/0x%02x 16/0x%04x 32/0x%08x\n", 
 						addr, MEM_READ8(me->mem, addr), MEM_READ16(me->mem, addr), MEM_READ32(me->mem, addr));
 				}else{
-					printf("could not parse address %s", argv[i]);
+					DPRINT("could not parse address %s", argv[i]);
 				}
 			}
 		}
@@ -484,19 +477,20 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 	{
 		if(argc == 1){
 			char n = 0;
-			printf("\navailable commands:\n");
+			DPRINT("\navailable commands:\n");
 			for(int i = 0; i < nCommands; i++){
-				printf("  %s %*s %s\n", commands[i].cmd, 
+				DPRINT("  %s %*s %s\n", commands[i].cmd, 
 					(int)(10 - strlen(commands[i].cmd)), &n, commands[i].desc);
 			}
+			DPRINT("\nNon-ambiguous short-hands are also accepted, such as s for step.\n");
 		}else{
 			for(int i = 0; i < nCommands; i++){
 				if(!strcmp(commands[i].cmd, argv[1])){
-					printf("\n%s usage:\n%s\n", commands[i].cmd, commands[i].help);
+					DPRINT("\n%s usage:\n%s\n", commands[i].cmd, commands[i].help);
 					return;
 				}
 			}
-			printf("no help for: %s\n", argv[1]);
+			DPRINT("no help for: %s\n", argv[1]);
 		}
 	}
 
@@ -505,57 +499,68 @@ void Debug_Inspector(Cpu* cpu, void* vme)
 	if(me->showNextIns) Where(0, NULL);
 	me->showNextIns = false;
 
-	while(!done){
-		char input[512];
+	int argc = 0;
+	char* argv[128];
 
-		printf("> ");
+	char* pch = strtok(input, " ,");
 
-		if(fgets(input, sizeof(input), stdin) == NULL){
-			// ctrl-d
-			printf("quit\n");
-			Quit(0, NULL);
+	if(!pch) return;
+
+	do{
+		argv[argc++] = strdup(pch);
+	}while((pch = strtok(NULL, " ,")));
+
+	int found = 0;
+	int index = 0;
+
+	for(int i = 0; i < nCommands; i++){
+		if(!strncmp(argv[0], commands[i].cmd, strlen(argv[0]))){
+			index = i;
+			found++;
 		}
-
-		input[strlen(input) - 1] = 0; // strip \n
-
-		int argc = 0;
-		char* argv[128];
-
-		char* pch = strtok(input, " ,");
-
-		if(!pch) continue;
-
-		do{
-			argv[argc++] = strdup(pch);
-		}while((pch = strtok(NULL, " ,")));
-
-		int found = 0;
-		int index = 0;
-
-		for(int i = 0; i < nCommands; i++){
-			if(!strncmp(argv[0], commands[i].cmd, strlen(argv[0]))){
-				index = i;
-				found++;
-			}
-		}
-	
-		if(found == 0) printf("%s - no such command, type help for more information\n", argv[0]);
-
-		else if(found > 1){
-			printf("'%s' is ambiguous, what did you mean? ", argv[0]);
-			for(int i = 0; i < nCommands; i++)
-				if(!strncmp(argv[0], commands[i].cmd, strlen(argv[0])))
-					printf("%s ", commands[i].cmd);
-			printf("\n");
-		}
-
-		else{
-			commands[index].fun(argc, argv);
-		}
-
-
-		for(int i = 0; i < argc; i++) free(argv[i]);
 	}
+
+	if(found == 0) DPRINT("%s - no such command, type help for more information\n", argv[0]);
+
+	else if(found > 1){
+		DPRINT("'%s' is ambiguous, what did you mean? ", argv[0]);
+		for(int i = 0; i < nCommands; i++)
+			if(!strncmp(argv[0], commands[i].cmd, strlen(argv[0])))
+				DPRINT("%s ", commands[i].cmd);
+		DPRINT("\n");
+	}
+
+	else{
+		commands[index].fun(argc, argv);
+		if(done){
+			Debug_Continue(me);
+		}
+	}
+
+
+	for(int i = 0; i < argc; i++) free(argv[i]);
+}
+
+bool Debug_Inspector(Cpu* cpu, void* vme)
+{
+	Debug* me = vme;
+	if(!Cpu_GetPerformIns(cpu))
+		return me->running;
+
+	if(!me->running)
+		return false;
+
+	me->insExec++;
+	
+	if(me->runInstructions != 0){
+		if(me->runInstructions > 0)
+			me->runInstructions--;
+
+		return me->running;
+	}
+
+
+	return me->running;
 }
 
 Debug* Debug_Create(Cpu* cpu, Mem* mem)
@@ -570,18 +575,7 @@ Debug* Debug_Create(Cpu* cpu, Mem* mem)
 	Vector_Init(me->debugSymbols, DebugSymbol);
 	Vector_Init(me->breakPoints, BreakPoint);
 
-	sDebug = me;
-
-#ifndef WIN32
-	// unix
-	signal(SIGABRT, &signalHandler);
-	signal(SIGTERM, &signalHandler);
-	signal(SIGINT, &signalHandler);
-#else
-	// windows
-	LAssertWarn(SetConsoleCtrlHandler( (PHANDLER_ROUTINE)ConsoleHandler, TRUE),
-		"could not set control handler, ctrl-c will kill application");
-#endif
+	me->Print = Debug_DefaultPrintHandler;
 
 	return me;
 }

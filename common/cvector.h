@@ -4,6 +4,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define VMIN(_a, _b) ((_a) < (_b) ? (_a) : (_b))
+#define VMAX(_a, _b) ((_a) > (_b) ? (_a) : (_b))
+
 #define Vector(type) \
 	struct type ## _vec_s\
 	{\
@@ -11,49 +14,50 @@
 		type* elems;\
 		int pAllocCount;\
 		int pElemSize;\
-		void* (*mmalloc)(size_t size);\
-		void (*mfree)(void* ptr);\
 	}
 
-#define Vector_InitExt(vec, type, _count, _mmalloc, _mfree) \
+#define Vector_Init(vec, type) Vector_InitEx(vec, type, 16);
+#define Vector_InitEx(vec, type, _count) \
 	do{\
 		(vec).count = 0;\
 		(vec).pElemSize = sizeof(type);\
-		(vec).mmalloc = (_mmalloc);\
-		(vec).mfree = (_mfree);\
-		(vec).elems = (vec).mmalloc((vec).pElemSize * (_count));\
+		(vec).elems = malloc((vec).pElemSize * (_count));\
 		(vec).pAllocCount = (_count);\
 	}while(0);
-
-#define Vector_Init(vec, type) Vector_InitExt(vec, type, 256, malloc, free)
 
 #define Vector_Add(vec, elem) \
 	do{\
 		if((vec).pAllocCount <= (vec).count + 1){ \
-			void* __tmpbuffer = (vec).mmalloc((vec).pElemSize * (vec).pAllocCount * 2); \
+			void* __tmpbuffer = malloc((vec).pElemSize * (vec).pAllocCount * 2); \
 			memcpy(__tmpbuffer, (vec).elems, (vec).pAllocCount * (vec).pElemSize);\
 			(vec).pAllocCount *= 2;\
-			(vec).mfree((vec).elems);\
+			free((vec).elems);\
 			(vec).elems = __tmpbuffer;\
 		}\
 		(vec).elems[(vec).count++] = (elem);\
-	}while(0)\
+	}while(0);
 
-#define Vector_Remove(vec, _at) \
+#define Vector_Remove(vec, _at, _n) \
 	do{\
-		for(int i = 0; i < vec.count - _at - 1; i++){ \
-			memcpy(vec.elems + _at + i, vec.elems + _at + i + 1, vec.pElemSize); \
-		} \
-		vec.count--;\
+		if((_at) < 0 || (_n) < 0) break;\
+		if((_at) >= (vec).count) break;\
+		if((_n) <= (vec).count - (_at) - 1){\
+			for(int __i = (_at); __i < _at + (vec).count - ((_at) + (_n)); __i++){ \
+				(vec).elems[__i] = (vec).elems[__i + (_n)];\
+			}\
+			(vec).count -= (_n);\
+		}else{\
+			(vec).count -= (vec).count - (_at);\
+		}\
 	}while(0);
 
 #define Vector_Concat(vec, src)\
-	for(int i = 0; i < (src).count; i++){\
+	for(int __i = 0; __i < (src).count; __i++){\
 		Vector_Add((vec), (src).elems[i])\
 	}
 
 #define Vector_ForEach(vec, _iterator) for(_iterator = (vec).elems; (_iterator) < (vec).elems + (vec).count; (_iterator)++)
 
-#define Vector_Free(vec) (vec).mfree((vec).elems)
+#define Vector_Free(vec) free((vec).elems)
 
 #endif

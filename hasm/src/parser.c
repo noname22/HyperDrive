@@ -391,6 +391,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 		}
 		
 		LAssertError(toknum - 1 == InsNumOps(insnum), "%s expects %d operands (not %d)", dinsNames[insnum], InsNumOps(insnum), toknum - 1);
+		LAssertError(operands[0] != DV_NextWord || !DINS_MODS_TARGET(insnum), "Can't assign literal (did you mean [literal]?)");
 
 		// Write to output
 

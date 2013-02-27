@@ -1,4 +1,4 @@
-//#define LDEBUG
+#define LDEBUG
 #include "hyper.h"
 #include "log.h"
 #include <stdlib.h>
@@ -18,6 +18,8 @@ struct HyperMachine {
 	Debug* debug;
 
 	int insPerScanLine;
+	int insLeft;
+	bool vdpDone;
 };
 
 void HM_SysWrite(Cpu* cpu, void* data)
@@ -45,16 +47,32 @@ HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug, int freq)
 
 	if(debug)
 		me->debug = Debug_Create(me->cpu, me->mem);
-		
 
 	return me;
 }
 
 void HM_Tick(HyperMachine* me)
 {
-	LogD("tick");
-	while(Vdp_HandleScanLine(me->vdp)){
-		Cpu_Execute(me->cpu, me->insPerScanLine);
+	while(true){
+		if(!me->vdpDone && me->insLeft <= 0){
+			// no instructions left to execute for this scanline, start a new one
+			me->vdpDone = !Vdp_HandleScanLine(me->vdp);
+			me->insLeft = me->insPerScanLine;
+		}
+
+		me->insLeft -= Cpu_Execute(me->cpu, me->insLeft);
+
+		if(me->insLeft > 0){
+			// CPU didn't finish the specified number of cycles, it's paused.
+			// Continue executing on the next call
+			break;
+		}else if(me->vdpDone){
+			// the CPU did finish, and the VDP is also done. Frame complete.
+			// Prepare for next;
+			
+			me->vdpDone = false;
+			break;
+		}
 	}
 }
 
@@ -74,4 +92,9 @@ bool HM_LoadRom(HyperMachine* me, const char* filename, const char* debugFilenam
 		Debug_LoadSymbols(me->debug, debugFilename);
 
 	return true;
+}
+
+Debug* HM_GetDebugger(HyperMachine* me)
+{
+	return me->debug; 
 }

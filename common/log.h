@@ -21,5 +21,6 @@
 extern int logLevel;
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #endif
