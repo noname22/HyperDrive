@@ -56,7 +56,6 @@ struct Debug {
 	void* printData;
 
 	bool showNextIns;
-	bool running;
 };
 
 #define DPRINT(...) me->Print(me, me->printData, __VA_ARGS__)
@@ -100,7 +99,7 @@ DebugSymbol* Debug_GetDebugSymbolByItem(Debug* me, const char* item)
 
 bool Debug_GetRunning(Debug* me)
 {
-	return me->running;
+	return me->runInstructions == -1;
 }
 
 const char* SourceFile_GetLine(SourceFile* me, int line)
@@ -187,12 +186,12 @@ DebugSymbol* GetSymbolFromAddress(Debug* me, uint32_t addr)
 
 void Debug_Break(Debug* me)
 {
-	me->running = false;
+	me->runInstructions = 0;
 }
 
 void Debug_Continue(Debug* me)
 {
-	me->running = true;
+	me->runInstructions = -1;
 }
 
 void Debug_HandleInput(Debug* me, const char* text)
@@ -220,12 +219,9 @@ void Debug_HandleInput(Debug* me, const char* text)
 
 	// XXX get rid of the nested functions. It's a GCC extension, not C99.
 
-	bool done = false;
-
 	void Continue(int argc, char** argv){
 		if(argc == 1){
 			me->runInstructions = -1;
-			done = true;
 			return;
 		}
 		
@@ -233,22 +229,10 @@ void Debug_HandleInput(Debug* me, const char* text)
 		RAssert(sscanf(argv[1], "%u", &numIns) == 1, "expected literal\n");
 
 		me->runInstructions = numIns;
-
-		done = true;
 	}
 
 	void Run(int argc, char** argv)
 	{
-		if(Cpu_GetRegister(cpu, DR_PC) != 0 && !Cpu_GetExit(cpu)){
-			char buffer[8];
-			DPRINT("program already running, restart? (y/n) ");
-			if(fgets(buffer, sizeof(buffer), stdin) == NULL)
-				return;
-
-			if(buffer[0] != 'y')
-				return;
-		}
-
 		Cpu_SetExit(cpu, false);
 		Cpu_SetRegister(cpu, DR_PC, 0);
 		Continue(argc, argv);
@@ -269,9 +253,8 @@ void Debug_HandleInput(Debug* me, const char* text)
 	}
 
 	void Step(int argc, char** argv){
-		me->runInstructions = 0;
+		me->runInstructions = 1;
 		me->showNextIns = true;
-		done = true;
 	}
 
 	void Break(int argc, char** argv){
@@ -532,9 +515,6 @@ void Debug_HandleInput(Debug* me, const char* text)
 
 	else{
 		commands[index].fun(argc, argv);
-		if(done){
-			Debug_Continue(me);
-		}
 	}
 
 
@@ -544,23 +524,15 @@ void Debug_HandleInput(Debug* me, const char* text)
 bool Debug_Inspector(Cpu* cpu, void* vme)
 {
 	Debug* me = vme;
-	if(!Cpu_GetPerformIns(cpu))
-		return me->running;
 
-	if(!me->running)
+	if(me->runInstructions == 0)
 		return false;
 
+	if(me->runInstructions > 0)
+		me->runInstructions--;
+
 	me->insExec++;
-	
-	if(me->runInstructions != 0){
-		if(me->runInstructions > 0)
-			me->runInstructions--;
-
-		return me->running;
-	}
-
-
-	return me->running;
+	return true;
 }
 
 Debug* Debug_Create(Cpu* cpu, Mem* mem)

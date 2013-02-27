@@ -83,10 +83,12 @@ bool DW_HandleEvent(DebugWidget* me, SDL_Event* event)
 
 	else if(!me->active && event->type == SDL_KEYDOWN){
 		switch(event->key.keysym.sym){
-			case SDLK_BACKQUOTE:
-				LogV("debug mode");
-				Debug_Break(me->debug);
-				return true;
+			case SDLK_c:
+				if(event->key.keysym.mod & KMOD_CTRL){
+					LogV("debug mode");
+					Debug_Break(me->debug);
+					return true;
+				}
 			default: break;
 		}
 	}
