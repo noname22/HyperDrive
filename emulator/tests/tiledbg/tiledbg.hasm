@@ -32,7 +32,11 @@ start:
 	set.l [VDP0_PAL], pal
         set.l [VDP0_DATA], level
 	set.l [VDP0_TILESET], tile_ptrs
-	set.l [VDP0_CKEY], 2
+	set.b [VDP0_CKEY], 2
+
+	set.l a, VDP_FLAG_LOOPX
+	bor a, VDP_FLAG_LOOPY
+	set.b [VDP0_FLAGS], a
 
 	; Set up tile pointers
 	set.l a, tile_ptrs
@@ -43,20 +47,36 @@ start:
 	tile_loop:
 		set.l [a], b
 
-		add a, 4   ; // next 32-bit ptr
+		add a, 4   ; // next 32-bit ptr + 8 bit flags
 		add b, 256 ; // tile size 16 * 16
 
 		add i, 1
 		ifn i, 16
 			set.l pc, tile_loop
-	
-	
 
 	lvl_loop:
-		set.b [level+x], 2
+		set.b [level+x], 6
+		add x, 2
 
-		add x, 6
-		ifg 1024, x
+		set.l a, x
+		mod a, 4
+
+		ife a, 1
+			set.b [level+x], VDP_FLAG_MIRRORX
+
+		ife a, 2
+			set.b [level+x], VDP_FLAG_MIRRORY
+
+		ife a, 3
+			set.l y, VDP_FLAG_MIRRORX
+		ife a, 3
+			bor y, VDP_FLAG_MIRRORY
+		ife a, 3
+			set.b [level+x], y
+
+		add x, 1
+
+		ifg 3072, x
 			set.l pc, lvl_loop
 		
 

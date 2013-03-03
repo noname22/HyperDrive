@@ -17,6 +17,8 @@ start:
         set.l [VDP0_DATA], bitmap
         set.b [VDP0_CKEY], 0
         set.b [VDP0_BMODE], 0
+	set.b [VDP0_FLAGS], VDP_FLAG_LOOPX
+	bor [VDP0_FLAGS], VDP_FLAG_LOOPY
 
 	; inititalize layer 1
 	set.l [VDP1_MODE], 1
@@ -44,6 +46,16 @@ loop:
 vblank:
 	add z, 8       ; increase index into the sintab
 		       ; that X gets reset.l to (to create the wave effect)
+
+	set.l i, x     ; put phase + 90' in x = cos
+	add i, 256
+	mod i, 1024
+
+	set.l [VDP0_X], [sintab+x] ; update the bg image to "circle", x for sin
+	set.l [VDP0_Y], [sintab+i] ; and i for cos
+
+	add [VDP0_X], 96 ; adjust to make the image centered
+	add [VDP0_Y], 56
 
 	set.l x, z       ; reset.l the index into the sintab to Z
 	set.l pc, pop

@@ -15,6 +15,7 @@ entry:
 .const VDP0_DATA     0x300011C
 .const VDP0_CKEY     0x3000120
 .const VDP0_BMODE    0x3000121
+.const VDP0_FLAGS    0x3000122
 
 .const VDP1_MODE     0x3000140
 .const VDP1_WIDTH    0x3000144
@@ -26,6 +27,12 @@ entry:
 .const VDP1_DATA     0x300015C
 .const VDP1_CKEY     0x3000160
 .const VDP1_BMODE    0x3000161
+.const VDP1_FLAGS    0x3000162
+
+.const VDP_FLAG_MIRRORX 1 
+.const VDP_FLAG_MIRRORY 2
+.const VDP_FLAG_LOOPX   4
+.const VDP_FLAG_LOOPY   8
 
 .const IRQ_HBLANK    0x3000000
 .const IRQ_VBLANK    0x3000004
@@ -37,10 +44,10 @@ entry:
 .const SYS_WAIT_INTERRUPT 0
 .const SYS_PRINT          1
 
-.const INPUT0        0x3002100
-.const INPUT1        0x3002104
-.const INPUT2        0x3002108
-.const INPUT3        0x300210C
+.const INPUT0        0x3004100
+.const INPUT1        0x3004104
+.const INPUT2        0x3004108
+.const INPUT3        0x300410C
 
 .const INPUT_A       1
 .const INPUT_B       2
@@ -54,4 +61,3 @@ entry:
 .const INPUT_DOWN    512
 .const INPUT_LEFT    1024
 .const INPUT_RIGHT   2048
-

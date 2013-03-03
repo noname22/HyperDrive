@@ -52,6 +52,12 @@ void Vdp_GetLayerData(Vdp* me, VLayer* layer, int layerNum)
 
 	layer->colorKey = MEM_READ8(me->mem, lAddr); lAddr++;
 	layer->blendMode = MEM_READ8(me->mem, lAddr); lAddr++;
+	layer->flags = MEM_READ8(me->mem, lAddr); lAddr++;
+
+	layer->mirrorX = (layer->flags & VF_MirrorX) != 0;
+	layer->mirrorY = (layer->flags & VF_MirrorX) != 0;
+	layer->loopX = (layer->flags & VF_LoopX) != 0;
+	layer->loopY = (layer->flags & VF_LoopY) != 0;
 
 	if(layer->mode > 2){
 		layer->tileSize = 1 << layer->mode;
@@ -91,18 +97,37 @@ void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 	// Bitmap mode
 	for(int x = 0; x < me->w; x++){
 		int xx = x - layer->x;
-		if(xx < 0)
-			goto no_draw;
+		if(layer->mirrorX)
+			xx = (xx - layer->w + 1) * -1;
+		
+		if(layer->loopX){
+			xx %= layer->w;
+			if(xx < 0)
+				xx += layer->w;
+		}else{
+			if(xx < 0)
+				goto no_draw;
 
-		if(xx >= layer->w)
-			break;
+			if(xx >= layer->w)
+				break;
+		}
 
 		int yy = me->y - layer->y;
-		if(yy < 0)
-			goto no_draw;
 
-		if(yy >= layer->h)
-			break;
+		if(layer->loopY){
+			yy %= layer->h;
+			if(yy < 0)
+				yy += layer->h;
+		}else{
+			if(layer->mirrorY)
+				yy = (yy - layer->h + 1) * -1;
+
+			if(yy < 0)
+				goto no_draw;
+
+			if(yy >= layer->h)
+				break;
+		}
 
 		int idx = xx + yy * layer->w;
 		if(idx >= MEM_SIZE)
@@ -122,28 +147,62 @@ void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 
 void Vdp_LayerScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 {
+	int wPx = layer->w * layer->tileSize;
+	int hPx = layer->h * layer->tileSize;
+
 	for(int x = 0; x < me->w; x++){
 		int xx = x - layer->x;
-		if(xx < 0)
-			goto no_draw;
+		if(layer->mirrorX)
+			xx = (xx - wPx + 1) * -1;
+		
+		if(layer->loopX){
+			xx %= wPx;
+			if(xx < 0)
+				xx += wPx;
+		}else{
+			if(xx < 0)
+				goto no_draw;
 
-		if(xx >= layer->w * layer->tileSize)
-			break;
+			if(xx >= wPx)
+				break;
+		}
 
 		int yy = me->y - layer->y;
-		if(yy < 0)
-			goto no_draw;
+		if(layer->mirrorY)
+			yy = (xx - hPx + 1) * -1;
 
-		if(yy >= layer->h * layer->tileSize)
-			break;
+		if(layer->loopY){
+			yy %= hPx;
+			if(yy < 0)
+				yy += hPx;
+		}else{
+			if(yy < 0)
+				goto no_draw;
 
+			if(yy >= layer->h * layer->tileSize)
+				break;
+		}
+		
 		int tilePos = xx / layer->tileSize + yy / layer->tileSize * layer->w;
-		int tileNum = MEM_READ16(me->mem, layer->data + tilePos * 2);
+
+		int idx = layer->data + tilePos * 3;
+		int tileNum = MEM_READ16(me->mem, idx);
+		uint8_t flags = MEM_READ8(me->mem, idx + 2);
+
 		uint32_t tile = MEM_READ32(me->mem, layer->tileset + tileNum * 4);
 
 		//LogD("%d -> 0x%x", tileNum, tile);
 
-		uint32_t spx = MEM_READ8(me->mem, tile + (xx % layer->tileSize) + (yy % layer->tileSize) * layer->tileSize) * 3;
+		int xTile = xx % layer->tileSize;
+		int yTile = yy % layer->tileSize;
+
+		if(flags & VF_MirrorX)
+			xTile = (xTile - layer->tileSize + 1) * -1;
+		
+		if(flags & VF_MirrorY)
+			yTile = (yTile - layer->tileSize + 1) * -1;
+
+		uint32_t spx = MEM_READ8(me->mem, tile + xTile + yTile * layer->tileSize) * 3;
 
 		if(spx == layer->colorKey * 3)
 			goto no_draw;
@@ -166,6 +225,9 @@ bool Vdp_HandleScanLine(Vdp* me)
 		VLayer layer;
 
 		Vdp_GetLayerData(me, &layer, i);
+		
+		if(layer.mode == 0)
+			continue;
 
 		if(!once[i]){
 			LogD("layer:     %d", i);
@@ -177,11 +239,14 @@ bool Vdp_HandleScanLine(Vdp* me)
 			LogD("data:      %08x", layer.data);
 			LogD("color key: %02x", layer.colorKey);
 			LogD("blend mode: %02x", layer.blendMode);
+			LogD("flags:");
+			LogD("  mirrorX: %d", layer.mirrorX);
+			LogD("  mirrorY: %d", layer.mirrorY);
+			LogD("  loopX:   %d", layer.loopX);
+			LogD("  loopY:   %d", layer.loopY);
 			once[i] = true;
 		}
 
-		if(layer.mode == 0)
-			continue;
 		if(layer.mode == 1)
 			Vdp_LayerMode1ScanLine(me, &layer, px);
 		else
