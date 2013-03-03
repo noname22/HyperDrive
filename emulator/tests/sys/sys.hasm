@@ -27,13 +27,31 @@ entry:
 .const VDP1_CKEY     0x3000160
 .const VDP1_BMODE    0x3000161
 
-.const VDP_LAYER1    0x3000120
-
 .const IRQ_HBLANK    0x3000000
 .const IRQ_VBLANK    0x3000004
+.const IRQ_INPUT     0x3000008
 
 .const DISPLAY_W     320
 .const DISPLAY_H     240
 
 .const SYS_WAIT_INTERRUPT 0
 .const SYS_PRINT          1
+
+.const INPUT0        0x3002100
+.const INPUT1        0x3002104
+.const INPUT2        0x3002108
+.const INPUT3        0x300210C
+
+.const INPUT_A       1
+.const INPUT_B       2
+.const INPUT_C       4
+.const INPUT_D       8
+.const INPUT_SELECT  16
+.const INPUT_START   32
+.const INPUT_L       64
+.const INPUT_R       128
+.const INPUT_UP      256
+.const INPUT_DOWN    512
+.const INPUT_LEFT    1024
+.const INPUT_RIGHT   2048
+

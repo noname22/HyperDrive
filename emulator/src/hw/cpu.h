@@ -19,7 +19,7 @@ void Cpu_Push(Cpu* me, uint32_t v);
 void Cpu_DumpState(Cpu* me);
 
 typedef enum { DR_A, DR_B, DR_C, DR_X, DR_Y, DR_Z, DR_I, DR_J, DR_SP, DR_PC, DR_O } Cpu_Register;
-typedef enum { CI_Hblank, CI_Vblank } Cpu_Irq;
+typedef enum { CI_Hblank, CI_Vblank, CI_Input } Cpu_Irq;
 
 uint32_t Cpu_GetRegister(Cpu* me, Cpu_Register reg);
 void Cpu_SetRegister(Cpu* me, Cpu_Register reg, uint32_t val);

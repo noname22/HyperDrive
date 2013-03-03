@@ -1,9 +1,26 @@
 .include "../sys/sys.hasm"
 
-.const level   0x2000000
+.const tile_ptrs  0x2000000
+.const level      0x2000100
 
 handle_vsync:
 	set.l pc, pop
+
+animate:
+	add x, 256
+	mod x, 1024
+
+	set.l a, tile_ptrs
+	add a, 8
+
+	set.l b, tileset
+	add b, 512
+	add b, x
+
+	set.l [a], b
+
+	set.l pc, pop
+	
 
 start:
 	set.l [IRQ_VBLANK], handle_vsync
@@ -14,19 +31,67 @@ start:
 	set.l [VDP0_HEIGHT], 32
 	set.l [VDP0_PAL], pal
         set.l [VDP0_DATA], level
-	set.l [VDP0_TILESET], tileset
-	set.l [VDP0_CKEY], 1
+	set.l [VDP0_TILESET], tile_ptrs
+	set.l [VDP0_CKEY], 2
+
+	; Set up tile pointers
+	set.l a, tile_ptrs
+	set.l b, tileset
+
+	set.l i, 0
+
+	tile_loop:
+		set.l [a], b
+
+		add a, 4   ; // next 32-bit ptr
+		add b, 256 ; // tile size 16 * 16
+
+		add i, 1
+		ifn i, 16
+			set.l pc, tile_loop
+	
+	
 
 	lvl_loop:
-		set.b [level+x], 1
+		set.b [level+x], 2
 
 		add x, 6
 		ifg 1024, x
 			set.l pc, lvl_loop
 		
 
+	set.l x, 0
+	set.l y, 0
+
 	loop:
-		sub [VDP0_X], 1
+		add y, 1
+		mod y, 10
+		ife y, 9
+			jsr animate
+
+		set.l j, [INPUT0]
+		and j, INPUT_RIGHT
+
+		ifg j, 0
+			sub [VDP0_X], 1
+
+		set.l j, [INPUT0]
+		and j, INPUT_LEFT
+
+		ifg j, 0
+			add [VDP0_X], 1
+		
+		set.l j, [INPUT0]
+		and j, INPUT_UP
+
+		ifg j, 0
+			add [VDP0_Y], 1
+
+		set.l j, [INPUT0]
+		and j, INPUT_DOWN
+
+		ifg j, 0
+			sub [VDP0_Y], 1
 
 		sys SYS_WAIT_INTERRUPT
 		set.l pc, loop

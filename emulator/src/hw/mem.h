@@ -19,6 +19,8 @@
 #define MEM_IVT_BASE MEM_REG_BASE
 #define MEM_VDP_BASE (MEM_REG_BASE + 0x100)
 
+#define MEM_INPUT_BASE 0x3002100
+
 typedef struct Mem Mem;
 struct Mem {
 	uint8_t* mem;

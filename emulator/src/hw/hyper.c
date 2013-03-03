@@ -94,6 +94,21 @@ bool HM_LoadRom(HyperMachine* me, const char* filename, const char* debugFilenam
 	return true;
 }
 
+void HM_TriggerInput(HyperMachine* me, int controller, HM_Button button, bool state)
+{
+	uint32_t idx = MEM_INPUT_BASE + (4 * (controller % 4));
+	uint32_t c = MEM_READ32(me->mem, idx);
+
+	if(state)
+		c |= button;
+	else
+		c &= ~button;
+
+	MEM_WRITE32(me->mem, idx, c);
+
+	Cpu_Interrupt(me->cpu, CI_Input);
+}
+
 Debug* HM_GetDebugger(HyperMachine* me)
 {
 	return me->debug; 

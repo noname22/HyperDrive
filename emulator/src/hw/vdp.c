@@ -138,10 +138,12 @@ void Vdp_LayerScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 			break;
 
 		int tilePos = xx / layer->tileSize + yy / layer->tileSize * layer->w;
-		int tile = MEM_READ16(me->mem, layer->data + tilePos * 2);
+		int tileNum = MEM_READ16(me->mem, layer->data + tilePos * 2);
+		uint32_t tile = MEM_READ32(me->mem, layer->tileset + tileNum * 4);
 
-		int spx = MEM_READ8(me->mem, layer->tileset + tile * layer->tileSize * layer->tileSize + 
-			(xx % layer->tileSize) + (yy % layer->tileSize) * layer->tileSize) * 3;
+		//LogD("%d -> 0x%x", tileNum, tile);
+
+		uint32_t spx = MEM_READ8(me->mem, tile + (xx % layer->tileSize) + (yy % layer->tileSize) * layer->tileSize) * 3;
 
 		if(spx == layer->colorKey * 3)
 			goto no_draw;
@@ -156,10 +158,10 @@ void Vdp_LayerScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 
 bool Vdp_HandleScanLine(Vdp* me)
 {
-	static bool once[8] = {false};
+	static bool once[256] = {false};
 	memset(me->p, 0, 3 * me->w);
 
-	for(int i = 0; i < 8; i++){
+	for(int i = 0; i < 256; i++){
 		uint8_t* px = me->p;
 		VLayer layer;
 

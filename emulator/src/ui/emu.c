@@ -91,6 +91,16 @@ int Emu_Run(Emu* me)
 
 			if(me->debugWidget && DW_HandleEvent(me->debugWidget, &event))
 				continue;
+
+			if(event.type == SDL_KEYDOWN || event.type == SDL_KEYUP){
+				switch(event.key.keysym.sym){
+					case SDLK_UP:    HM_TriggerInput(hm, 0, HM_Up, event.type == SDL_KEYDOWN); break;
+					case SDLK_DOWN:  HM_TriggerInput(hm, 0, HM_Down, event.type == SDL_KEYDOWN); break;
+					case SDLK_LEFT:  HM_TriggerInput(hm, 0, HM_Left, event.type == SDL_KEYDOWN); break;
+					case SDLK_RIGHT: HM_TriggerInput(hm, 0, HM_Right, event.type == SDL_KEYDOWN); break;
+					default: break;
+				}
+			}
 		}
 
 		HM_Tick(hm);
