@@ -1,4 +1,4 @@
-.include "../sys/sys.asm"
+.include "../sys/sys.hasm"
 
 .const level   0x2000000
 

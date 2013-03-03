@@ -1,4 +1,4 @@
-.include "../sys/sys.asm"
+.include "../sys/sys.hasm"
 
 ; display buffers at beginning of RAM
 .const buffer0  0x2000000
