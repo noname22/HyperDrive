@@ -19,6 +19,7 @@ typedef struct {
 	int32_t  x, y, w, h;
 	uint8_t colorKey;
 	Vdp_BlendMode blendMode;
+	int tileSize;
 } VLayer;
 
 Vdp* Vdp_Create(Cpu* cpu, Mem* mem, int w, int h, uint8_t* vMem);

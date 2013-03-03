@@ -2,7 +2,7 @@
 #include <SDL.h>
 #include <SDL_image.h>
 
-#include "../../common/log.h"
+#include "../common/log.h"
 #include <stdint.h>
 
 int logLevel = 0;
