@@ -271,7 +271,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 
 				case DI_Mul:
 					me->o = ((uint64_t)op[0] * (uint64_t)op[1] >> 32) & 0xffffffff;
-					op[0] *= op[0];
+					op[0] *= op[1];
 					OP_SET(0, op[0]);
 					me->cycles += 2;
 					break;

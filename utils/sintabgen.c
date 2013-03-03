@@ -4,7 +4,7 @@
 
 #include <math.h>
 #include <stdlib.h>
-#include "../../common/log.h"
+#include "../common/log.h"
 
 int logLevel = 0;
 

@@ -16,20 +16,6 @@ struct Vdp {
 	Cpu* cpu;
 };
 
-typedef enum {
-	VB_Replace,
-	VB_Add,
-	VB_Subtract
-} Vdp_BlendMode;
-
-
-typedef struct {
-	uint32_t mode, tileset, palette, data;
-	int32_t  x, y, w, h;
-	uint8_t colorKey;
-	Vdp_BlendMode blendMode;
-} VLayer;
-
 Vdp* Vdp_Create(Cpu* cpu, Mem* mem, int w, int h, uint8_t* vMem)
 {
 	Vdp* me = calloc(1, sizeof(Vdp));
@@ -105,6 +91,26 @@ void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 	}
 }
 
+void Vdp_GetLayerData(Vdp* me, VLayer* layer, int layerNum)
+{
+	uint32_t lAddr = MEM_VDP_BASE + layerNum * 16 * 4;
+
+	layer->mode = MEM_READ32(me->mem, lAddr); lAddr += 4;
+
+	layer->w = MEM_READ32(me->mem, lAddr); lAddr += 4;
+	layer->h = MEM_READ32(me->mem, lAddr); lAddr += 4;
+
+	layer->x = MEM_READ32(me->mem, lAddr); lAddr += 4;
+	layer->y = MEM_READ32(me->mem, lAddr); lAddr += 4;
+
+	layer->tileset = MEM_READ32(me->mem, lAddr); lAddr += 4;
+	layer->palette = MEM_READ32(me->mem, lAddr); lAddr += 4;
+	layer->data = MEM_READ32(me->mem, lAddr); lAddr += 4;
+
+	layer->colorKey = MEM_READ8(me->mem, lAddr); lAddr++;
+	layer->blendMode = MEM_READ8(me->mem, lAddr); lAddr++;
+}
+
 bool Vdp_HandleScanLine(Vdp* me)
 {
 	static bool once[8] = {false};
@@ -114,24 +120,7 @@ bool Vdp_HandleScanLine(Vdp* me)
 		uint8_t* px = me->p;
 		VLayer layer;
 
-		uint32_t lAddr = MEM_VDP_BASE + i * 8 * 4;
-
-		layer.mode = MEM_READ32(me->mem, lAddr); lAddr += 4;
-
-		if(!layer.mode) continue;
-
-		layer.w = MEM_READ32(me->mem, lAddr); lAddr += 4;
-		layer.h = MEM_READ32(me->mem, lAddr); lAddr += 4;
-		
-		layer.x = MEM_READ32(me->mem, lAddr); lAddr += 4;
-		layer.y = MEM_READ32(me->mem, lAddr); lAddr += 4;
-
-		layer.tileset = MEM_READ32(me->mem, lAddr); lAddr += 4;
-		layer.palette = MEM_READ32(me->mem, lAddr); lAddr += 4;
-		layer.data = MEM_READ32(me->mem, lAddr); lAddr += 4;
-
-		layer.colorKey = MEM_READ8(me->mem, lAddr); lAddr++;
-		layer.blendMode = MEM_READ8(me->mem, lAddr); lAddr++;
+		Vdp_GetLayerData(me, &layer, i);
 
 		if(!once[i]){
 			LogD("layer:     %d", i);

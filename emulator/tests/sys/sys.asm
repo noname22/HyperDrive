@@ -16,8 +16,16 @@ entry:
 .const VDP0_CKEY     0x3000120
 .const VDP0_BMODE    0x3000121
 
-.const VDP1_X        0x300012C
-.const VDP1_Y        0x3000130
+.const VDP1_MODE     0x3000140
+.const VDP1_WIDTH    0x3000144
+.const VDP1_HEIGHT   0x3000148
+.const VDP1_X        0x300014C
+.const VDP1_Y        0x3000150
+.const VDP1_TILESET  0x3000154
+.const VDP1_PAL      0x3000158
+.const VDP1_DATA     0x300015C
+.const VDP1_CKEY     0x3000160
+.const VDP1_BMODE    0x3000161
 
 .const VDP_LAYER1    0x3000120
 

@@ -98,3 +98,18 @@ Debug* HM_GetDebugger(HyperMachine* me)
 {
 	return me->debug; 
 }
+
+Vdp* HM_GetVdp(HyperMachine* me)
+{
+	return me->vdp;
+}
+
+Cpu* HM_GetCpu(HyperMachine* me)
+{
+	return me->cpu;
+}
+
+Mem* HM_GetMem(HyperMachine* me)
+{
+	return me->mem;
+}

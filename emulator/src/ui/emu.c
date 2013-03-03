@@ -124,7 +124,9 @@ int Emu_Run(Emu* me)
 
 		int frameTime = SDL_GetTicks() - timer;
 		DrawText(screen, 10, 10, white, "frametime: %d", frameTime);
-		DW_Draw(me->debugWidget, screen, w * mult, h * mult);
+	
+		if(me->debugWidget)
+			DW_Draw(me->debugWidget, screen, w * mult, h * mult);
 
 		SDL_Flip(screen);
 
