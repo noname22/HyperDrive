@@ -58,11 +58,13 @@ start:
 			ifn i, j
 				set.l pc, gen_loop
 
+		; copy and blur line below, lines 176 - 240
+
 		set.l i, buffer
 		set.l j, i
 		add j, 76480
 
-		add i, 56320
+		add i, 66560
 
 		set.l z, i
 		add z, 319
@@ -70,17 +72,14 @@ start:
 		copy_loop:
 			set.l x, z
 			set.b y, [x]
-			and y, 0xff
 			set.l a, y
 
 			add x, 1
 			set.b y, [x]
-			and y, 0xff
 			add a, y
 			
 			add x, 1
 			set.b y, [x]
-			and y, 0xff
 			add a, y
 
 			div a, 3

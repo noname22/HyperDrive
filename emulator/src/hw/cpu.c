@@ -228,8 +228,8 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		#define OP_GET(_o) (reg[_o] ? *reg[_o] : MEM_READ32(me->mem, pv[_o]))
 
 		#define OP_SET(_o, _v) (reg[_o] ? *reg[_o] = (_v): MEM_WRITE32(me->mem, pv[_o], (_v)))
-		#define OP_SET16(_o, _v) (reg[_o] ? *reg[_o] = (_v): MEM_WRITE16(me->mem, pv[_o], (_v)))
-		#define OP_SET8(_o, _v) (reg[_o] ? *reg[_o] = (_v): MEM_WRITE8(me->mem, pv[_o], (_v)))
+		#define OP_SET16(_o, _v) (reg[_o] ? *reg[_o] = (uint16_t)(_v): MEM_WRITE16(me->mem, pv[_o], (_v)))
+		#define OP_SET8(_o, _v) (reg[_o] ? *reg[_o] = (uint8_t)(_v): MEM_WRITE8(me->mem, pv[_o], (_v)))
 		
 		if(me->performNextIns){ 
 			uint32_t tmp, op[2] = {0};
