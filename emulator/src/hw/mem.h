@@ -37,9 +37,14 @@ Mem* Mem_Create();
 #define MEM_FROMLE32(__v) __v
 #define MEM_FROMLE16(__v) __v
 
+#define MEM_READ_UNSAFE32(_mem, _addr) (MEM_FROMLE32(*(uint32_t*)&(_mem)->mem[_addr]))
+#define MEM_READ_UNSAFE16(_mem, _addr) (MEM_FROMLE16(*(uint16_t*)&(_mem)->mem[_addr]))
+#define MEM_READ_UNSAFE8(_mem, _addr) ((_mem)->mem[_addr])
+
 #define MEM_READ32(_mem, _addr) (MEM_FROMLE32(*(uint32_t*)MEM_READ_PTR((_mem), (_addr))))
 #define MEM_READ16(_mem, _addr) (MEM_FROMLE16(*(uint16_t*)MEM_READ_PTR((_mem), (_addr))))
-#define MEM_READ8(_mem, _addr)  (*MEM_READ_PTR(_mem, (_addr)))
+//#define MEM_READ8(_mem, _addr)  (*MEM_READ_PTR(_mem, (_addr)))
+#define MEM_READ8(_mem, _addr)  ((_mem)->mem[(_addr) & MEM_MASK])
 
 #define MEM_WRITE8(_mem, _addr, _v) (*(MEM_WRITE_PTR((_mem), (_addr))) = _v)
 #define MEM_WRITE16(_mem, _addr, _v) (*((uint16_t*)MEM_WRITE_PTR((_mem), (_addr))) = MEM_TOLE16(_v))

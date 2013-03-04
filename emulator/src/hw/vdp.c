@@ -46,19 +46,19 @@ Vdp* Vdp_Create(Cpu* cpu, Mem* mem, int w, int h, uint8_t* vMem)
 	l->mode = MEM_READ32(me->mem, lAddr); lAddr += 4;\
 
 #define GETLAYERDATA2\
-	l->w = MEM_READ32(me->mem, lAddr); lAddr += 4;\
-	l->h = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+	l->w = MEM_READ_UNSAFE32(me->mem, lAddr); lAddr += 4;\
+	l->h = MEM_READ_UNSAFE32(me->mem, lAddr); lAddr += 4;\
 \
-	l->x = MEM_READ32(me->mem, lAddr); lAddr += 4;\
-	l->y = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+	l->x = MEM_READ_UNSAFE32(me->mem, lAddr); lAddr += 4;\
+	l->y = MEM_READ_UNSAFE32(me->mem, lAddr); lAddr += 4;\
 \
-	l->tileset = MEM_READ32(me->mem, lAddr); lAddr += 4;\
-	l->palette = MEM_READ32(me->mem, lAddr); lAddr += 4;\
-	l->data = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+	l->tileset = MEM_READ_UNSAFE32(me->mem, lAddr); lAddr += 4;\
+	l->palette = MEM_READ_UNSAFE32(me->mem, lAddr); lAddr += 4;\
+	l->data = MEM_READ_UNSAFE32(me->mem, lAddr); lAddr += 4;\
 \
-	l->colorKey = MEM_READ8(me->mem, lAddr); lAddr++;\
-	l->blendMode = MEM_READ8(me->mem, lAddr); lAddr++;\
-	l->flags = MEM_READ8(me->mem, lAddr); lAddr++;\
+	l->colorKey = MEM_READ_UNSAFE8(me->mem, lAddr); lAddr++;\
+	l->blendMode = MEM_READ_UNSAFE8(me->mem, lAddr); lAddr++;\
+	l->flags = MEM_READ_UNSAFE8(me->mem, lAddr); lAddr++;\
 \
 	l->mirrorX = (l->flags & VF_MirrorX) != 0;\
 	l->mirrorY = (l->flags & VF_MirrorX) != 0;\
@@ -272,9 +272,10 @@ bool Vdp_HandleScanLine(Vdp* me)
 			Vdp_LayerMode1ScanLine(me, &layer, px);
 		else
 			Vdp_LayerScanLine(me, &layer, px);
-		
-		Cpu_Interrupt(me->cpu, CI_Hblank);
 	}
+
+	Cpu_Interrupt(me->cpu, CI_Hblank);
+
 	me->p += me->w * 3;
 
 	if(++me->y >= me->h){

@@ -17,10 +17,10 @@ start:
         set.l [VDP0_DATA], bitmap
         set.b [VDP0_CKEY], 0
         set.b [VDP0_BMODE], 0
-	set.b [VDP0_FLAGS], VDP_FLAG_LOOPX
-	bor [VDP0_FLAGS], VDP_FLAG_LOOPY
-	bor [VDP0_FLAGS], VDP_FLAG_MIRRORX
-	bor [VDP0_FLAGS], VDP_FLAG_MIRRORY
+	;set.b [VDP0_FLAGS], VDP_FLAG_LOOPX
+	;bor [VDP0_FLAGS], VDP_FLAG_LOOPY
+	;bor [VDP0_FLAGS], VDP_FLAG_MIRRORX
+	;bor [VDP0_FLAGS], VDP_FLAG_MIRRORY
 
 	; inititalize layer 1
 	set.l [VDP1_MODE], 1
