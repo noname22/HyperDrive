@@ -21,7 +21,8 @@
 
 #define MEM_INPUT_BASE 0x3004100
 
-typedef struct Mem Mem;
+#include "htypes.h"
+
 struct Mem {
 	uint8_t* mem;
 };

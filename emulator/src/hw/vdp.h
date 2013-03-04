@@ -4,9 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct Vdp Vdp;
-typedef struct Mem Mem;
-typedef struct Cpu Cpu;
+#include "htypes.h"
 
 typedef enum {
 	VB_Replace,

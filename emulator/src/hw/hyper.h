@@ -4,11 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct HyperMachine HyperMachine;
-typedef struct Debug Debug;
-typedef struct Vdp Vdp;
-typedef struct Cpu Cpu;
-typedef struct Mem Mem;
+#include "htypes.h"
 
 typedef enum {
 	HM_A = 1, HM_B = 2, HM_C = 4, HM_D = 8, HM_Select = 16, HM_Start = 32, MM_L = 64, HM_R = 128, HM_Up = 256, HM_Down = 512, HM_Left = 1024, HM_Right = 2048

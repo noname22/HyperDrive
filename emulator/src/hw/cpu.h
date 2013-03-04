@@ -4,8 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct Cpu Cpu;
-typedef struct Mem Mem;
+#include "htypes.h"
 
 Cpu* Cpu_Create(Mem* mem);
 void Cpu_Destroy(Cpu** me);

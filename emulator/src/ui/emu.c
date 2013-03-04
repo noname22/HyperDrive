@@ -80,6 +80,8 @@ int Emu_Run(Emu* me)
 		me->debugWidget = DW_Create(hm);
 	}
 	
+	int t = 0, tSpent = 0, frameCount = 0;
+	
 	while(!done){
 		int timer = SDL_GetTicks();
 
@@ -103,7 +105,17 @@ int Emu_Run(Emu* me)
 			}
 		}
 
+		
+		t = SDL_GetTicks(); 
 		HM_Tick(hm);
+		tSpent += SDL_GetTicks() - t;
+
+		int nFrames = 60 * 5;
+		if(frameCount++ >= nFrames){
+			LogV("spent %d ms for the last %d frames, or %.2f ms/frame", tSpent, nFrames, (double)tSpent / (double)nFrames);
+			frameCount = 0;
+			tSpent = 0;
+		}
 
 		if(videoFile){
 			if(settings->numRecFrames == 0 || frame++ < settings->numRecFrames)

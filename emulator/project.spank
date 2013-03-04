@@ -1,4 +1,8 @@
 name      hyperdrive
-cflags    std=c99 ggdb Wall I../common Isrc/hw Isrc/ui O3
+cflags    std=c99 ggdb Wall I../common Isrc/hw Isrc/ui
+#cflags    Ofast fomit-frame-pointer funroll-loops
+cflags    O3 
+#compiler  clang
+#compiler  tcc
 lib       sdl
 sourcedir src ../common

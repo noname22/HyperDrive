@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 #include "cpu.h"
-
-typedef struct Debug Debug;
+#include "htypes.h"
 
 Debug* Debug_Create(Cpu* cpu, Mem* mem);
 void Debug_Destroy(Debug** me);
