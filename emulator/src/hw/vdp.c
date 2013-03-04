@@ -1,6 +1,7 @@
 #define LDEBUG
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "vdp.h"
 #include "mem.h"
@@ -31,39 +32,49 @@ Vdp* Vdp_Create(Cpu* cpu, Mem* mem, int w, int h, uint8_t* vMem)
 	return me;
 }
 
-#define VMAX(_x, _y) (_y) ^ (((_x) ^ (_y)) & -((_x) < (_y)))
-#define VMIN(_x, _y) (_x) ^ (((_x) ^ (_y)) & -((_x) < (_y)))
+//#define VMIN(_x, _y) (_y) ^ (((_x) ^ (_y)) & -((_x) < (_y)))
+//#define VMAX(_x, _y) (_x) ^ (((_x) ^ (_y)) & -((_x) < (_y)))
 
-void Vdp_GetLayerData(Vdp* me, VLayer* layer, int layerNum)
+#define VMIN(_x, _y) ((_y) + (((_x) - (_y)) & (((_x) - (_y)) >> (sizeof(int) * CHAR_BIT - 1))))
+#define VMAX(_x, _y) ((_x) - (((_x) - (_y)) & (((_x) - (_y)) >> (sizeof(int) * CHAR_BIT - 1))))
+
+#define VMOD(_a, _b) ((((_a) % (_b)) + (_b)) % (_b))
+
+#define GETLAYERDATA1\
+	uint32_t lAddr = MEM_VDP_BASE + i * 16 * 4;\
+\
+	l->mode = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+
+#define GETLAYERDATA2\
+	l->w = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+	l->h = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+\
+	l->x = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+	l->y = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+\
+	l->tileset = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+	l->palette = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+	l->data = MEM_READ32(me->mem, lAddr); lAddr += 4;\
+\
+	l->colorKey = MEM_READ8(me->mem, lAddr); lAddr++;\
+	l->blendMode = MEM_READ8(me->mem, lAddr); lAddr++;\
+	l->flags = MEM_READ8(me->mem, lAddr); lAddr++;\
+\
+	l->mirrorX = (l->flags & VF_MirrorX) != 0;\
+	l->mirrorY = (l->flags & VF_MirrorX) != 0;\
+	l->loopX = (l->flags & VF_LoopX) != 0;\
+	l->loopY = (l->flags & VF_LoopY) != 0;\
+\
+	if(l->mode > 2){\
+		l->tileSize = 1 << l->mode;\
+	}else{\
+		l->tileSize = 0;\
+	}\
+
+void Vdp_GetLayerData(Vdp* me, VLayer* l, int i)
 {
-	uint32_t lAddr = MEM_VDP_BASE + layerNum * 16 * 4;
-
-	layer->mode = MEM_READ32(me->mem, lAddr); lAddr += 4;
-
-	layer->w = MEM_READ32(me->mem, lAddr); lAddr += 4;
-	layer->h = MEM_READ32(me->mem, lAddr); lAddr += 4;
-
-	layer->x = MEM_READ32(me->mem, lAddr); lAddr += 4;
-	layer->y = MEM_READ32(me->mem, lAddr); lAddr += 4;
-
-	layer->tileset = MEM_READ32(me->mem, lAddr); lAddr += 4;
-	layer->palette = MEM_READ32(me->mem, lAddr); lAddr += 4;
-	layer->data = MEM_READ32(me->mem, lAddr); lAddr += 4;
-
-	layer->colorKey = MEM_READ8(me->mem, lAddr); lAddr++;
-	layer->blendMode = MEM_READ8(me->mem, lAddr); lAddr++;
-	layer->flags = MEM_READ8(me->mem, lAddr); lAddr++;
-
-	layer->mirrorX = (layer->flags & VF_MirrorX) != 0;
-	layer->mirrorY = (layer->flags & VF_MirrorX) != 0;
-	layer->loopX = (layer->flags & VF_LoopX) != 0;
-	layer->loopY = (layer->flags & VF_LoopY) != 0;
-
-	if(layer->mode > 2){
-		layer->tileSize = 1 << layer->mode;
-	}else{
-		layer->tileSize = 0;
-	}
+	GETLAYERDATA1
+	GETLAYERDATA2
 }
 
 #define PX(px_, spx_)\
@@ -92,56 +103,65 @@ void Vdp_GetLayerData(Vdp* me, VLayer* layer, int layerNum)
 				break;\
 		}
 
+#define PX_SUB\
+	*(px) = VMAX((int)*px - *MEM_READ_PTR(me->mem, layer->palette + spx), 0);\
+	px++; spx++;\
+	*(px) = VMAX((int)*px - *MEM_READ_PTR(me->mem, layer->palette + spx), 0);\
+	px++; spx++;\
+	*(px) = VMAX((int)*px - *MEM_READ_PTR(me->mem, layer->palette + spx), 0);\
+	px++; spx++;
+
+#define PX_ADD\
+	*(px) = VMIN((int)*px + *MEM_READ_PTR(me->mem, layer->palette + spx), 255);\
+	px++; spx++;\
+	*(px) = VMIN((int)*px + *MEM_READ_PTR(me->mem, layer->palette + spx), 255);\
+	px++; spx++;\
+	*(px) = VMIN((int)*px + *MEM_READ_PTR(me->mem, layer->palette + spx), 255);\
+	px++; spx++;
+
+#define PX_REPLACE\
+	*(px++) = *MEM_READ_PTR(me->mem, layer->palette + spx++);\
+	*(px++) = *MEM_READ_PTR(me->mem, layer->palette + spx++);\
+	*(px++) = *MEM_READ_PTR(me->mem, layer->palette + spx);
+
+
 void Vdp_LayerMode1ScanLine(Vdp* me, VLayer* layer, uint8_t* px)
 {
 	// Bitmap mode
-	for(int x = 0; x < me->w; x++){
-		int xx = x - layer->x;
-		if(layer->mirrorX)
-			xx = (xx - layer->w + 1) * -1;
-		
-		if(layer->loopX){
-			xx %= layer->w;
-			if(xx < 0)
-				xx += layer->w;
-		}else{
-			if(xx < 0)
-				goto no_draw;
+	
+	if(!layer->loopY && (me->y < layer->y || me->y >= layer->y + layer->h))
+		return;
 
-			if(xx >= layer->w)
-				break;
-		}
+	int row = layer->data + VMOD( (layer->mirrorY ? (layer->h - 1) - me->y : me->y) - layer->y, layer->h) * layer->w;
+	int to = layer->loopX ? me->w - layer->x : VMIN(layer->w, me->w - layer->x);
+	int from = layer->loopX ? -layer->x : 0;
+	int inc = 1;
 
-		int yy = me->y - layer->y;
+	if(layer->mirrorX){
+		int tmp = from;
+		from = to;
+		to = tmp - 1;
+		inc = -1;
+	}
 
-		if(layer->loopY){
-			yy %= layer->h;
-			if(yy < 0)
-				yy += layer->h;
-		}else{
-			if(layer->mirrorY)
-				yy = (yy - layer->h + 1) * -1;
+	if(!layer->loopX)
+		px += layer->x * 3;
 
-			if(yy < 0)
-				goto no_draw;
+	#define M1BEFORE\
+	for(int x = from; x != to; x += inc){\
+		int spx = MEM_READ8(me->mem, row + VMOD(x, layer->w)) * 3;\
+		if(spx != layer->colorKey * 3){
 
-			if(yy >= layer->h)
-				break;
-		}
 
-		int idx = xx + yy * layer->w;
-		if(idx >= MEM_SIZE)
-			goto no_draw;
+	#define M1AFTER\
+		}else\
+			px += 3;\
+	}
 
-		int spx = MEM_READ8(me->mem, layer->data + idx) * 3;
-		if(spx == layer->colorKey * 3)
-			goto no_draw;
-		
-		PX(px, spx)
-		continue;
-
-		no_draw:
-		px += 3;
+	switch(layer->blendMode){
+		case VB_Replace:  M1BEFORE PX_REPLACE M1AFTER break;
+		case VB_Add:      M1BEFORE PX_ADD     M1AFTER break;
+		case VB_Subtract: M1BEFORE PX_SUB     M1AFTER break;
 	}
 }
 
@@ -223,11 +243,12 @@ bool Vdp_HandleScanLine(Vdp* me)
 	for(int i = 0; i < 256; i++){
 		uint8_t* px = me->p;
 		VLayer layer;
+		VLayer* l = &layer;
 
-		Vdp_GetLayerData(me, &layer, i);
-		
+		GETLAYERDATA1	
 		if(layer.mode == 0)
 			continue;
+		GETLAYERDATA2
 
 		if(!once[i]){
 			LogD("layer:     %d", i);

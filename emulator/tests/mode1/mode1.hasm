@@ -19,6 +19,8 @@ start:
         set.b [VDP0_BMODE], 0
 	set.b [VDP0_FLAGS], VDP_FLAG_LOOPX
 	bor [VDP0_FLAGS], VDP_FLAG_LOOPY
+	bor [VDP0_FLAGS], VDP_FLAG_MIRRORX
+	bor [VDP0_FLAGS], VDP_FLAG_MIRRORY
 
 	; inititalize layer 1
 	set.l [VDP1_MODE], 1
