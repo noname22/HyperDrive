@@ -10,6 +10,7 @@
 
 #include "utils.h"
 #include "emu.h"
+#include "apu.h"
 #include "hyper.h"
 #include "debug.h"
 #include "SDL_picofont.h"
@@ -20,6 +21,7 @@
 
 struct Emu {
 	Settings* settings;
+	Apu* apu;
 	DebugWidget* debugWidget;
 };
 
@@ -37,6 +39,8 @@ Emu* Emu_Create(Settings* settings)
 void Emu_AudioCallback(void* vMe, Uint8 *stream, int len)
 {
 	Emu* me = (Emu*)vMe;
+	Apu_FetchAudio(me->apu, (int16_t*)stream, len / 4);
+
 	/*static float t = 0;
 
 	for(int i = 0; i < len / 4; i++){
@@ -145,6 +149,8 @@ int Emu_Run(Emu* me)
 
 	HyperMachine* hm = HM_Create(w, h, 1000.0 / 16.0, px, settings->debugFile != NULL, settings->freq);
 	LAssert(HM_LoadRom(hm, settings->file, settings->debugFile), "bailing");
+
+	me->apu = HM_GetApu(hm);
 
 	if(settings->debugFile){
 		me->debugWidget = DW_Create(hm);
