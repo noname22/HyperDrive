@@ -31,6 +31,79 @@ Emu* Emu_Create(Settings* settings)
 	return me;
 }
 
+
+//#include <math.h>
+
+void Emu_AudioCallback(void* vMe, Uint8 *stream, int len)
+{
+	Emu* me = (Emu*)vMe;
+	/*static float t = 0;
+
+	for(int i = 0; i < len / 4; i++){
+		t += .1;
+		((int16_t*)stream)[i * 2] = sinf(t) * 8192.0f;
+		((int16_t*)stream)[i * 2 + 1] = sinf(t) * 8192.0f;
+	}*/
+}
+
+void Emu_InitAudio(Emu* me){
+	LogV("inititalizing audio");
+
+	SDL_AudioSpec fmt;
+
+	fmt.freq = 48000;
+	fmt.format = AUDIO_S16;
+	fmt.channels = 2;
+	fmt.samples = 1024;
+	fmt.callback = Emu_AudioCallback;
+	fmt.userdata = me;
+
+	LAssert(SDL_OpenAudio(&fmt, NULL) == 0, "failed to open audio device: %s", SDL_GetError());
+
+	SDL_PauseAudio(0);
+}
+
+void Emu_ScaleBlit(Emu* me, SDL_Surface* target, SDL_Surface* src, int mult)
+{
+	int x = 0;
+	#define EBS_BEFORE \
+		uint8_t* tp = target->pixels, *sp = src->pixels;\
+		for(int y = 0; y < src->h; y++){\
+			for(int j = 0; j < mult; j++){\
+				for(x = 0; x < src->w; x++){\
+					for(int i = 0; i < mult; i++){
+
+	#define EBS_AFTER \
+				}\
+				sp += 3;\
+			}\
+			sp -= src->pitch;\
+		}\
+		tp += target->pitch - x * mult * 3;\
+		sp += src->pitch;\
+	}
+
+	if(target->format->Rmask == 0xff0000){
+		// RGB24
+		EBS_BEFORE
+
+		*(tp++) = *(sp + 2);
+		*(tp++) = *(sp + 1);
+		*(tp++) = *sp;
+		
+		EBS_AFTER
+	}else{
+		// BGR24 (I hope)
+		EBS_BEFORE
+
+		*(tp++) = *sp;
+		*(tp++) = *(sp + 1);
+		*(tp++) = *(sp + 2);
+		
+		EBS_AFTER
+	}
+}
+
 int Emu_Run(Emu* me)
 {
 	SDL_Init(SDL_INIT_EVERYTHING);
@@ -61,19 +134,16 @@ int Emu_Run(Emu* me)
 		mult = 2;
 	}
 
-	SDL_Surface* screen = SDL_SetVideoMode(wUse, hUse, 0, SDL_SWSURFACE);
+	SDL_Surface* screen = SDL_SetVideoMode(wUse, hUse, 24, SDL_SWSURFACE);
 
 	// Virtual display pixels
 	uint8_t* px = calloc(1, w * h * 3);
 
-	// Upscaled display
-	uint8_t* spx = calloc(1, w * h * mult * mult * 3);
-	SDL_Surface* scaleSurface = SDL_CreateRGBSurfaceFrom(spx, w * mult, h * mult, 24, w * 3 * mult, 0xff, 0xff00, 0xff0000, 0);
-	//SDL_Surface* origSurface = SDL_CreateRGBSurfaceFrom(px, w, h, 24, w * 3, 0xff0000, 0xff00, 0xff, 0);
+	SDL_Surface* origSurface = SDL_CreateRGBSurfaceFrom(px, w, h, 24, w * 3, 0xff0000, 0xff00, 0xff, 0);
 
 	bool done = false;
 
-	HyperMachine* hm = HM_Create(w, h, px, settings->debugFile != NULL, settings->freq);
+	HyperMachine* hm = HM_Create(w, h, 1000.0 / 16.0, px, settings->debugFile != NULL, settings->freq);
 	LAssert(HM_LoadRom(hm, settings->file, settings->debugFile), "bailing");
 
 	if(settings->debugFile){
@@ -81,6 +151,8 @@ int Emu_Run(Emu* me)
 	}
 	
 	int t = 0, tSpent = 0, frameCount = 0;
+
+	Emu_InitAudio(me);
 	
 	while(!done){
 		int timer = SDL_GetTicks();
@@ -107,7 +179,7 @@ int Emu_Run(Emu* me)
 
 		
 		t = SDL_GetTicks(); 
-		HM_Tick(hm);
+		HM_ProcessFrame(hm);
 		tSpent += SDL_GetTicks() - t;
 
 		int nFrames = 60 * 5;
@@ -122,33 +194,13 @@ int Emu_Run(Emu* me)
 				fwrite(px, w * h * 3, 1, videoFile);
 		}
 
-		// scale mult times
-		uint8_t* tp = spx, *sp = px;
-		for(int y = 0; y < h; y++){
-			for(int j = 0; j < mult; j++){
-				for(int x = 0; x < w; x++){
-					for(int i = 0; i < mult; i++){
-						*(tp++) = *sp;
-						*(tp++) = *(sp + 1);
-						*(tp++) = *(sp + 2);
-					}
-					sp += 3;
-				}
-				sp -= w * 3;
-			}
-			sp += w * 3;
-		}
+		if(me->debugWidget)
+			DW_Draw(me->debugWidget, screen, w * mult, h * mult);
 
-		if(settings->debugFile)
-			SDL_FillRect(screen, NULL, 0x22222222);
-
-		SDL_BlitSurface(scaleSurface, NULL, screen, NULL);
+		Emu_ScaleBlit(me, screen, origSurface, mult);
 
 		int frameTime = SDL_GetTicks() - timer;
 		DrawText(screen, 10, 10, white, "frametime: %d", frameTime);
-	
-		if(me->debugWidget)
-			DW_Draw(me->debugWidget, screen, w * mult, h * mult);
 
 		SDL_Flip(screen);
 

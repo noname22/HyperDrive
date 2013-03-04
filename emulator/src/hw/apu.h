@@ -3,10 +3,11 @@
 
 #include <stdint.h>
 
-typedef struct Apu Apu;
-typedef struct Mem Mem;
+#include "htypes.h"
 
-Apu* Apu_Create(Mem* mem, int bufferSize);
+#define APU_RATE 48000
+
+Apu* Apu_Create(Mem* mem, int nBufferSamples);
 void Apu_ProcessAudio(Apu* me, int nSamples);
 
 // stream is expected to be a native byte ordered, signed 16 bit, 48 KHz stream with stereo samples (4 bytes per sample, 2 per channel)

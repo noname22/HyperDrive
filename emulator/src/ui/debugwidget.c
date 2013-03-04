@@ -104,6 +104,8 @@ void DW_DrawVdpLayerInfo(DebugWidget* me, SDL_Surface* target, int x, int y, int
 
 void DW_Draw(DebugWidget* me, SDL_Surface* target, int ow, int oh)
 {
+	SDL_FillRect(target, NULL, 0x22222222);
+
 	SDL_Color white = {255, 255, 255, 255};
 	TB_Draw(me->dbgLog, target, 8, oh, (target->h - oh) / 8 - 2);
 

@@ -3,15 +3,18 @@
 #include "log.h"
 #include <stdlib.h>
 #include "common.h"
+#include <math.h>
 
 #include "mem.h"
 #include "cpu.h"
 #include "vdp.h"
+#include "apu.h"
 
 #include "debug.h"
 
 struct HyperMachine {
 	Vdp* vdp;
+	Apu* apu;
 	Cpu* cpu;
 	Mem* mem;
 
@@ -20,6 +23,12 @@ struct HyperMachine {
 	int insPerScanLine;
 	int insLeft;
 	bool vdpDone;
+
+	int smp;
+	int smpPerLine;
+	int extraSmpNth;
+	int smpPerFrame;
+	int scanLine;
 };
 
 void HM_SysWrite(Cpu* cpu, void* data)
@@ -32,7 +41,7 @@ void HM_SysWrite(Cpu* cpu, void* data)
 	}
 }
 
-HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug, int freq)
+HyperMachine* HM_Create(int w, int h, double frameRate, uint8_t* display, bool debug, int freq)
 {
 	HyperMachine* me = calloc(1, sizeof(HyperMachine));
 	LAssert(me, "could not allocate a machine");	
@@ -40,8 +49,20 @@ HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug, int freq)
 	me->mem = Mem_Create();
 	me->cpu = Cpu_Create(me->mem);
 	me->vdp = Vdp_Create(me->cpu, me->mem, w, h, display);
+	me->apu = Apu_Create(me->mem, 1024);
 
-	me->insPerScanLine = (int)((float)freq / 60.0 / (float)h);
+	me->insPerScanLine = (int)((float)freq / frameRate / (float)h);
+
+	me->smpPerFrame = (double)APU_RATE / frameRate;
+
+	double smpPerLine = (double)APU_RATE / frameRate / (double)h;
+	me->smpPerLine = floor(smpPerLine);
+	me->extraSmpNth = round(1.0 / (smpPerLine - (double)me->smpPerLine));
+
+	LogD("extra: %d", me->extraSmpNth);
+
+	if(me->extraSmpNth == 0)
+		me->extraSmpNth = 1;
 
 	Cpu_SetSysCall(me->cpu, HM_SysWrite, 1, me);
 
@@ -51,7 +72,7 @@ HyperMachine* HM_Create(int w, int h, uint8_t* display, bool debug, int freq)
 	return me;
 }
 
-void HM_Tick(HyperMachine* me)
+void HM_ProcessFrame(HyperMachine* me)
 {
 	while(true){
 		if(!me->vdpDone && me->insLeft <= 0){
@@ -66,12 +87,37 @@ void HM_Tick(HyperMachine* me)
 			// CPU didn't finish the specified number of cycles, it's paused.
 			// Continue executing on the next call
 			break;
-		}else if(me->vdpDone){
-			// the CPU did finish, and the VDP is also done. Frame complete.
-			// Prepare for next;
-			
-			me->vdpDone = false;
-			break;
+		}else{
+			// CPU finished scanline. Process Audio.
+			int nSamples = me->smpPerLine + ((me->scanLine % me->extraSmpNth) == 0 ? 1 : 0);
+
+			if(nSamples + me->smp < me->smpPerFrame){
+				Apu_ProcessAudio(me->apu, nSamples);
+				me->smp += nSamples;
+			}
+
+			me->scanLine++;
+
+			if(me->vdpDone){
+				// The VDP is also done. Frame complete.
+				// Prepare for next;
+				
+				me->vdpDone = false;
+				me->scanLine = 0;
+
+				// Handle any samples that wern't processed during the frame
+				// but should have been to keep audio sync
+
+				nSamples = me->smpPerFrame - me->smp;
+				if(nSamples > 0){
+					Apu_ProcessAudio(me->apu, nSamples);
+					me->smp += nSamples;
+				}
+				
+				//LogD("%d / %d samples handled this frame", me->smp, me->smpPerFrame);
+				me->smp = 0;
+				break;
+			}
 		}
 	}
 }
@@ -127,4 +173,9 @@ Cpu* HM_GetCpu(HyperMachine* me)
 Mem* HM_GetMem(HyperMachine* me)
 {
 	return me->mem;
+}
+
+Apu* HM_GetApu(HyperMachine* me)
+{
+	return me->apu;
 }
