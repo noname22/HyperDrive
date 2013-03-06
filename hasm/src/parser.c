@@ -232,7 +232,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 		char* opLabels[2] = {NULL, NULL};
 		char* constName;
 
-		uint16_t tmp = 0;
+		uint32_t tmp = 0;
 		
 		if(StrEmpty(line)) continue;
 
@@ -332,6 +332,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 					int fSize = ReadFile(me->ram + addr, me->endAddr - addr, buffer);
 					LAssertError(fSize >= 0, "binary file include failed: %s", buffer);
 					LAssertWarn(fSize > 0, "included empty binary file: %s", buffer);
+					LogD("incbinned file of size: %d", fSize);
 					addr += fSize;
 				}
 

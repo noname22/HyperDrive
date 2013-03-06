@@ -1,0 +1,50 @@
+.include "../sys/sys.hasm"
+
+vblank:
+	add a, b
+	ife a, 255
+		set.l b, -1
+
+	ife a, 0
+		set.l b, 1
+
+	ifg [APU0_FREQ], 100
+		sub [APU0_FREQ], 100
+		
+	set.b [APU0_PAN], a
+
+	set.l pc, pop
+
+start:
+	set.l [APU0_SPTR], sample
+	set.l [APU0_POS], 0
+
+	set.l [APU0_FLAGS], APU_FLAG_16B
+	bor   [APU0_FLAGS], APU_FLAG_LOOP
+	bor   [APU0_FLAGS], APU_FLAG_LOOP_PP
+
+	set.l [APU0_FREQ], 48000
+	set.b [APU0_VOL], 255
+	set.b [APU0_PAN], 128
+
+	set.l a, sample_end
+	sub a, sample
+	div a, 2
+	sub a, 1
+
+	sub a, 20000
+	set.l [APU0_LEND], a
+
+	set.l [APU0_LSTART], 10000
+
+	set.l [IRQ_VBLANK], vblank
+
+	set.l a, 0
+	set.l b, 1
+
+	loop:
+		sys SYS_WAIT_INTERRUPT
+		set.l pc, loop
+
+sample:     .incbin "sample.raw"
+sample_end: .dw 0

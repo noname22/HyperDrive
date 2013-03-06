@@ -20,6 +20,7 @@
 #define MEM_VDP_BASE (MEM_REG_BASE + 0x100)
 
 #define MEM_INPUT_BASE 0x3004100
+#define MEM_APU_BASE   0x3008000
 
 #include "htypes.h"
 

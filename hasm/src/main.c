@@ -57,7 +57,7 @@ int main(int argc, char** argv)
 		LAssert(d->debugFile, "could not open file: %s", tmp);
 	}
 
-	uint16_t len = Hasm_Assemble(d, files[0], ram, addr, romSize - 1);
+	uint32_t len = Hasm_Assemble(d, files[0], ram, addr, romSize - 1);
 
 	if(d->debugFile) fclose(d->debugFile);
 

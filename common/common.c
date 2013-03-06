@@ -1,3 +1,4 @@
+#define LDEBUG
 #include "common.h"
 
 bool OpHasNextWord(uint16_t v){ 
@@ -36,6 +37,7 @@ int ReadFile(uint8_t* data, uint32_t size, const char* filename)
 		return -2;
 	}
 
+	LogD("reading file of size: %ld", fSize);
 	memset(data, 0, size);
 	LAssertWarn(fread(data, fSize, 1, f), "could not read file: %s", filename);
 	fclose(f);

@@ -61,3 +61,29 @@ entry:
 .const INPUT_DOWN    512
 .const INPUT_LEFT    1024
 .const INPUT_RIGHT   2048
+
+.const APU_BASE      0x3008000
+
+.const APU0_SPTR     0x3008000
+.const APU0_POS      0x3008004
+.const APU0_FLAGS    0x3008008
+.const APU0_LSTART   0x300800C
+.const APU0_LEND     0x3008010
+.const APU0_FREQ     0x3008014
+.const APU0_VOL      0x3008018
+.const APU0_PAN      0x3008019
+
+.const APU_CHN_SIZE  64
+
+.const APU_O_SPTR     0x00
+.const APU_O_POS      0x04
+.const APU_O_FLAGS    0x08
+.const APU_O_LSTART   0x0C
+.const APU_O_LEND     0x10
+.const APU_O_FREQ     0x14
+.const APU_O_VOL      0x18
+.const APU_O_PAN      0x19
+
+.const APU_FLAG_16B     1
+.const APU_FLAG_LOOP    2
+.const APU_FLAG_LOOP_PP 4
