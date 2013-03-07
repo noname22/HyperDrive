@@ -23,4 +23,6 @@ start:
 		sys SYS_WAIT_INTERRUPT
 		set.l pc, loop
 
-mod_file: .incbin "test.mod"
+;mod_file: .incbin "test.mod"
+;mod_file: .incbin "fountain.mod"
+mod_file: .incbin "pinball_illusions.mod"

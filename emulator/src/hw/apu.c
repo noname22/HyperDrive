@@ -1,4 +1,4 @@
-//#define LDEBUG
+#define LDEBUG
 #include "log.h"
 #include "apu.h"
 #include "mem.h"
@@ -76,6 +76,7 @@ void Apu_HandleChannel(Apu* me, int chnNum, int16_t* stream, int nSamples)
 	}
 
 	float pan = (float)(MEM_READ8(me->mem, addr)) / 255.0f; addr += 1;
+	LogD("loop start: %d", loopStart);
 	LogD("loop end: %d", loopEnd);
 
 	for(unsigned i = 0; i < nSamples; i++){

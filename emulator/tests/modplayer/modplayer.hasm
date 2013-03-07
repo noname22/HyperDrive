@@ -96,7 +96,7 @@ modplayer_parse_sample:
 	; 2 byte loop length
 	set.w [mps_replen+a], [j]
 
-	set.l x, mps_loopstart
+	set.l x, mps_replen
 	add x, a
 
 	set.b [1+x], [j]
@@ -248,6 +248,9 @@ modplayer_init:
 		ifn i, [mp_max_samples+x]
 			set.l pc, parse_sample_ptr_loop
 
+	; set default playback speed to 6
+	set.l [mp_spd+x], 6
+
 	set.l pc, pop
 
 ; trigger a note
@@ -279,15 +282,15 @@ modplayer_trigger_note:
 	set.l [APU_O_POS+z], 0
 
 	; set the loop start
-	set.l [APU_O_LEND+z], [mps_loopstart+x]
+	set.l [APU_O_LSTART+z], [mps_loopstart+x]
 	
 	; set the end pos
 	set.l [APU_O_LEND+z], [mps_loopstart+x]
-	add [APU_O_LSTART+z], [mps_replen+x]
+	add [APU_O_LEND+z], [mps_replen+x]
 
-	; enable looping if replen is bigger than 1
+	; enable looping if replen is bigger than 2 (1 in the file)
 	set.l [APU_O_FLAGS+x], 0
-	ifg [mps_replen+x], 1
+	ifg [mps_replen+x], 2
 		set.l [APU_O_FLAGS+x], APU_FLAG_LOOP
 
 	; set the volume
@@ -322,7 +325,8 @@ modplayer_trigger_note:
 ; update the player
 ;   a -> mod player object pointer
 
-mpt_note_msg: .dw "note: %d - %x - %x - %x", 10, 0
+mpt_note_msg:    .dw "note: %d - %x - %x - %x", 10, 0
+mpt_pattern_msg: .dw "pat: %d, pos: %d", 10, 0
 
 modplayer_tick:
 	jsr push_all
@@ -412,12 +416,12 @@ modplayer_tick:
 		add x, 1
 
 		; print parsed note
-		set.l push, j ; effect param
-		set.l push, y ; effect number
-		set.l push, b ; instrument number
-		set.l push, c ; order/note
-		set.l push, mpt_note_msg
-		sys SYS_PRINT
+		;set.l push, j ; effect param
+		;set.l push, y ; effect number
+		;set.l push, b ; instrument number
+		;set.l push, c ; order/note
+		;set.l push, mpt_note_msg
+		;sys SYS_PRINT
 		
 		; trigger the note if delay is 0
 		ife [mp_delay+a], 0
@@ -431,9 +435,51 @@ modplayer_tick:
 		ifn i, [mp_num_chn+a]
 			set.l pc, mp_channel_loop
 
-	set.l push, 0xaaaa
-	set.l push, mp_xmsg
+	; if the delay is not 0, just decrease the timer
+	ifn [mp_delay+a], 0
+		set.l pc, mpt_dec_timer
+
+	; show pattern
+	set.l push, [mp_pat_pos+a]
+	set.l push, [mp_curr_pat+a]
+	set.l push, mpt_pattern_msg
 	sys SYS_PRINT
 
-	jsr pop_all
-	set.l pc, pop
+	; reset note delay timer to speed
+	set.l [mp_delay+a], [mp_spd+a]
+	
+	; if pos is 63, jump to next pattern
+	ife [mp_pat_pos+a], 63
+		set.l pc, mpt_next_ptn
+	
+	; step to next pos
+	add [mp_pat_pos+a], 1
+
+	set.l pc, mpt_return
+
+	mpt_next_ptn:
+		; reset pos to 0
+		set.l [mp_pat_pos+a], 0
+
+		set.l b, [mp_num_pats+a]
+		sub b, 1
+
+		; if we're at the last pattern, loop to loop point
+		ife b, [mp_curr_pat+a]
+			set.l pc, mpt_loop_song
+
+		add [mp_curr_pat+a], 1
+
+		set.l pc, mpt_return
+
+	mpt_loop_song:
+		set.l [mp_curr_pat+a], [mp_restart_at+a]
+		set.l pc, mpt_return
+	
+	mpt_dec_timer:
+		ifn [mp_delay+a], 0
+			sub [mp_delay+a], 1
+
+	mpt_return:
+		jsr pop_all
+		set.l pc, pop
