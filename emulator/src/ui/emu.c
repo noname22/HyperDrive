@@ -81,9 +81,9 @@ void Emu_ScaleBlit(Emu* me, SDL_Surface* target, SDL_Surface* src, int mult)
 				}\
 				sp += 3;\
 			}\
-			sp -= src->pitch;\
+			sp -= (src->pitch);\
+			tp += target->pitch - x * mult * 3;\
 		}\
-		tp += target->pitch - x * mult * 3;\
 		sp += src->pitch;\
 	}
 

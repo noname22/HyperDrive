@@ -1,0 +1,26 @@
+.include "../sys/sys.hasm"
+.include "modplayer.hasm"
+
+.const MODPLAYER     0x2000100
+
+vblank:
+	set.l a, MODPLAYER
+	jsr modplayer_tick
+
+	set.l pc, pop
+
+start:
+
+	set.l a, MODPLAYER
+	set.l b, mod_file
+	set.l c, APU_BASE
+
+	jsr modplayer_init
+
+	set.l [IRQ_VBLANK], vblank
+
+	loop:
+		sys SYS_WAIT_INTERRUPT
+		set.l pc, loop
+
+mod_file: .incbin "test.mod"

@@ -25,13 +25,31 @@ struct HyperMachine {
 	bool vdpDone;
 };
 
-void HM_SysWrite(Cpu* cpu, void* data)
+void HM_SysPrint(Cpu* cpu, void* data)
 {
 	HyperMachine* me = data;
 	uint32_t addr = Cpu_Pop(cpu);
 	char c;
+	bool percent = false;
+
 	while((c = MEM_READ8(me->mem, addr++))){
-		fputc(c, stdout);
+		if(c == 'd' && percent)
+			printf("%d", Cpu_Pop(cpu));
+
+		if(c == 'x' && percent)
+			printf("%x", Cpu_Pop(cpu));
+		
+		if(c == 'c' && percent)
+			printf("%c", Cpu_Pop(cpu));
+
+		if(c == 's' && percent)
+			printf("%s", MEM_READ_PTR(me->mem, Cpu_Pop(cpu)));
+
+		if(!percent && c != '%'){
+			fputc(c, stdout);
+		}
+
+		percent = c == '%';
 	}
 }
 
@@ -47,7 +65,7 @@ HyperMachine* HM_Create(int w, int h, double frameRate, uint8_t* display, bool d
 
 	me->insPerScanLine = (int)((float)freq / frameRate / (float)h);
 
-	Cpu_SetSysCall(me->cpu, HM_SysWrite, 1, me);
+	Cpu_SetSysCall(me->cpu, HM_SysPrint, 1, me);
 
 	if(debug)
 		me->debug = Debug_Create(me->cpu, me->mem);

@@ -135,8 +135,8 @@ void Cpu_DumpState(Cpu* me)
 	LogD(" ");
 	LogD("Stack: ");
 
-	if(me->sp == MEM_BOS){
-		for(int i = MEM_BOS - 1; i >= me->sp; i -= 4){
+	if(me->sp != MEM_BOS){
+		for(int i = MEM_BOS - 4; i >= me->sp; i -= 4){
 			LogD("  0x%08x: 0x%08x", i, MEM_READ32(me->mem, i));
 		}
 	}else LogD("  (empty)");
@@ -168,6 +168,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 
 		uint32_t pv[2];
 		uint32_t* reg[2] = {NULL, NULL};
+		int spOnPerform = 0;
 
 		DIns ins = READ8;
 		
@@ -197,9 +198,9 @@ int Cpu_Execute(Cpu* me, int execCycles)
 			}
 
 			switch(v[i]){
-				case DV_Pop:          pv[i] = me->sp; me->sp += 4; break;
+				case DV_Pop:          pv[i] = me->sp + spOnPerform; spOnPerform += 4; break;
 				case DV_Peek:         pv[i] = me->sp; break;
-				case DV_Push:         me->sp -= 4; pv[i] = me->sp; break;
+				case DV_Push:         spOnPerform -= 4; pv[i] = me->sp + spOnPerform; break;
 				case DV_SP:           reg[i] = &me->sp; break;
 				case DV_PC:           reg[i] = &me->pc; break;
 				case DV_O:            reg[i] = &me->o; break;
@@ -228,10 +229,13 @@ int Cpu_Execute(Cpu* me, int execCycles)
 		#define OP_GET(_o) (reg[_o] ? *reg[_o] : MEM_READ32(me->mem, pv[_o]))
 
 		#define OP_SET(_o, _v) (reg[_o] ? *reg[_o] = (_v): MEM_WRITE32(me->mem, pv[_o], (_v)))
-		#define OP_SET16(_o, _v) (reg[_o] ? *reg[_o] = (uint16_t)(_v): MEM_WRITE16(me->mem, pv[_o], (_v)))
-		#define OP_SET8(_o, _v) (reg[_o] ? *reg[_o] = (uint8_t)(_v): MEM_WRITE8(me->mem, pv[_o], (_v)))
+		#define OP_SET16(_o, _v) (reg[_o] ? *reg[_o] = (uint16_t)(_v) : MEM_WRITE16(me->mem, pv[_o], (_v)))
+		#define OP_SET8(_o, _v) (reg[_o] ? *reg[_o] = (uint8_t)(_v) : MEM_WRITE8(me->mem, pv[_o], (_v)))
 		
 		if(me->performNextIns){ 
+			LogD("performing instruction");
+			me->sp += spOnPerform;
+
 			uint32_t tmp, op[2] = {0};
 			for(int i = 0; i < numOps; i++){
 				op[i] = OP_GET(i);
@@ -339,6 +343,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 				
 				case DI_Ife:
 					me->performNextIns = op[0] == op[1];
+					LogD("ife: %d vs %d -> %d", op[0], op[1], me->performNextIns);
 					me->cycles += 2 + (uint32_t)me->performNextIns;
 					break;
 
@@ -393,9 +398,7 @@ int Cpu_Execute(Cpu* me, int execCycles)
 
 		else me->performNextIns = true;
 
-		/*char bb[1024];
-		gets(bb);
-		Cpu_DumpState(me);*/
+		Cpu_DumpState(me);
 	}
 
 	// the CPU waits execCycles, while the VDP continues

@@ -87,3 +87,37 @@ entry:
 .const APU_FLAG_16B     1
 .const APU_FLAG_LOOP    2
 .const APU_FLAG_LOOP_PP 4
+
+.const STD_TMP        0x20000fc
+
+.const USER_RAM       0x2000100
+
+; push all normal registers to stack
+push_all:
+	set.l [STD_TMP], pop
+
+	set.l push, a
+	set.l push, b
+	set.l push, c
+	set.l push, x
+	set.l push, y
+	set.l push, z
+	set.l push, i
+	set.l push, j
+
+	set.l pc, [STD_TMP]
+
+; pop all normal registers from stack
+pop_all:
+	set.l [STD_TMP], pop
+
+	set.l j, pop
+	set.l i, pop
+	set.l z, pop
+	set.l y, pop
+	set.l x, pop
+	set.l c, pop
+	set.l b, pop
+	set.l a, pop
+
+	set.l pc, [STD_TMP]

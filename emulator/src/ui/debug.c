@@ -324,9 +324,9 @@ void Quit(Debug* me, int argc, char** argv){
 }
 
 typedef struct {const char* what; int v; } Printable;
-int Lookup(Printable* printables, const char* str){
+int Lookup(Printable* printables, int nPrintables, const char* str){
 	if(str[0] == '@') return -4;
-	for(int i = 0; i < sizeof(printables) / sizeof(Printable); i++){
+	for(int i = 0; i < nPrintables; i++){
 		if(!strcmp(printables[i].what, str)) return printables[i].v;
 	}
 	return -1;
@@ -342,7 +342,7 @@ void Print(Debug* me, int argc, char** argv){
 	};
 
 	for(int i = 1; i < argc; i++){
-		int what = Lookup(printables, argv[i]);
+		int what = Lookup(printables, sizeof(printables) / sizeof(Printable), argv[i]);
 	
 		if(what == -1){
 			unsigned addr = 0;
@@ -373,7 +373,7 @@ void Print(Debug* me, int argc, char** argv){
 			uint32_t sp = Cpu_GetRegister(me->cpu, DR_SP);
 
 			if(sp){
-				for(int i = MEM_BOS; i >= sp; i--){
+				for(int i = MEM_BOS; i >= sp; i -= 4){
 					DPRINT("  0x%08x\n", MEM_READ32(me->mem, i));
 				}
 			}else DPRINT("  (empty)\n");
@@ -481,9 +481,6 @@ void Debug_HandleInput(Debug* me, const char* text)
 
 	commands[0].fun = Help;
 
-	if(me->showNextIns) Where(me, 0, NULL);
-	me->showNextIns = false;
-
 	int argc = 0;
 	char* argv[128];
 
@@ -526,12 +523,28 @@ void Debug_HandleInput(Debug* me, const char* text)
 bool Debug_Inspector(Cpu* cpu, void* vme)
 {
 	Debug* me = vme;
-
+	
 	if(me->runInstructions == 0)
 		return false;
+	
+	if(me->runInstructions < 0 && Cpu_GetPerformIns(cpu)){
+		BreakPoint* bit;
+		Vector_ForEach(me->breakPoints, bit){
+			if(Cpu_GetRegister(cpu, DR_PC) == bit->addr && bit->enabled){
+				DPRINT("hit breakpoint: ");
+				Debug_PrintBreakPoint(vme, bit);
+				DPRINT("\n");
+				Debug_Break(me);
+				return false;
+			}
+		}
+	}
 
 	if(me->runInstructions > 0)
 		me->runInstructions--;
+
+	if(me->showNextIns) Where(me, 0, NULL);
+		me->showNextIns = false;
 
 	me->insExec++;
 	return true;
