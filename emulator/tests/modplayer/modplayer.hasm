@@ -14,8 +14,8 @@
 .const mp_pat_pos      0x28
 .const mp_delay        0x2c
 .const mp_spd          0x30
+.const mp_playing_pat  0x34
 
-;.const mp_file        0x34
 ;.const mp_curr_pat    0x38
 ;.const mp_pat_ptr     0x3c
 ;.const mp_chn_0       0x40
@@ -33,7 +33,7 @@
 .const mps_finetune   0x08
 .const mps_vol        0x0C
 .const mps_loopstart  0x10
-.const mps_replen     0x18
+.const mps_replen     0x14
 
 ; constants
 .const mp_magic_pal 7093789 ; "magic number" for PAL timing, period/freqency divisor
@@ -255,7 +255,7 @@ modplayer_init:
 			set.l pc, parse_sample_ptr_loop
 
 	; set default playback speed to 6
-	set.l [mp_spd+x], 6
+	set.l [mp_spd+x], 3
 
 	set.l pc, pop
 
@@ -329,6 +329,7 @@ modplayer_print_note:
 ;   a -> mod player object pointer
 ;   b -> instrument number
 ;   c -> order/note
+;   i -> channel number
 ;   j -> effect param
 ;   y -> effect number
 ;   z -> current channel pointer
@@ -344,6 +345,9 @@ modplayer_trigger_note:
 		set.l pc, pop
 
 	set.l push, x
+	set.l push, b
+
+	sub b, 1
 
 	; get a pointer to the sample/instrument structure
 	set.l x, mps_sizeof ; sizeof sample struct
@@ -357,32 +361,53 @@ modplayer_trigger_note:
 	; reset player position
 	set.l [APU_O_POS+z], 0
 
-	; set the loop start
-	set.l [APU_O_LSTART+z], [mps_loopstart+x]
-	
-	; set the end pos
-	set.l [APU_O_LEND+z], [mps_loopstart+x]
-	add [APU_O_LEND+z], [mps_replen+x]
-
 	; enable looping if replen is bigger than 2 (1 in the file)
-	set.l [APU_O_FLAGS+z], 0
-	ifg [mps_replen+x], 2
+	ifg 2, [mps_replen+x]
+		set.l pc, mptn_is_not_looped;
+
+	mptn_is_looped:
+		; set the loop start
+		set.l [APU_O_LSTART+z], [mps_loopstart+x]
+
+		; set the end pos
+		set.l [APU_O_LEND+z], [mps_loopstart+x]
+		add [APU_O_LEND+z], [mps_replen+x]
+
+		; set the loop flag
 		set.l [APU_O_FLAGS+z], APU_FLAG_LOOP
 
-	;set.l push, b
+		set.l pc, mptn_continue
+
+	mptn_is_not_looped:
+		; disable the loop
+		set.l [APU_O_FLAGS+z], 0
+		
+		; set the end pos to the sample length
+		set.l [APU_O_LEND+z], [mps_len+x]
+
+	mptn_continue:
+
+	;set.l push, [APU_O_FLAGS+z]
 	;set.l push, mp_dmsg
 	;sys SYS_PRINT
 
 	; set the volume
 	set.b [APU_O_VOL+z], [mps_vol+x]
 
-	; set pan (mono for now)
-	set.b [APU_O_PAN+z], 128
+	; set pan
+	set.l push, i
+
+	and i, 1
+	ife i, 1
+		set.b [APU_O_PAN+z], 165
+	ife i, 0
+		set.b [APU_O_PAN+z], 89
+
+	set.l i, pop
 
 	; set playback frequency
 	;   7093789.2 / (period * 2)
 
-	set.l push, b
 	set.l push, c
 
 	mul c, 2
@@ -396,8 +421,8 @@ modplayer_trigger_note:
 	;sys SYS_PRINT
 
 	set.l c, pop
-	set.l b, pop
 
+	set.l b, pop
 	set.l x, pop
 
 	set.l pc, pop
@@ -406,7 +431,7 @@ modplayer_trigger_note:
 ;   a -> mod player object pointer
 
 mpt_note_msg:    .db "note: %d %x %x %x", 10, 0
-mpt_pattern_msg: .db "[%02x:%02x]", 10, 0
+mpt_pattern_msg: .db "[%02x(%02x)/%02x %02x]", 10, 0
 
 modplayer_tick:
 	jsr push_all
@@ -417,7 +442,9 @@ modplayer_tick:
 	; get current pattern number from sequence and put in j
 	set.l j, [mp_seq_ptr+a]  ; pointer to sequence
 	add j, [mp_curr_pat+a]   ; index into sequence
-	set.l j, [j]             ; read pattern number from sequence
+	set.b j, [j]             ; read pattern number from sequence
+
+	set.l [mp_playing_pat+a], j
 
 	; Whole patterns size
 	set.l y, 64              ; 64 tracks per pattern
@@ -509,7 +536,6 @@ modplayer_tick:
 
 		; step to the next hardware channel
 		add z, APU_CHN_SIZE
-						
 
 		add i, 1
 		ifn i, [mp_num_chn+a]
@@ -521,6 +547,8 @@ modplayer_tick:
 
 	; show pattern
 	set.l push, [mp_pat_pos+a]
+	set.l push, [mp_num_pats+a]
+	set.l push, [mp_playing_pat+a]
 	set.l push, [mp_curr_pat+a]
 	set.l push, mpt_pattern_msg
 	sys SYS_PRINT
