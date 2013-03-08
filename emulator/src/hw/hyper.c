@@ -30,27 +30,38 @@ void HM_SysPrint(Cpu* cpu, void* data)
 	HyperMachine* me = data;
 	uint32_t addr = Cpu_Pop(cpu);
 	char c;
-	bool percent = false;
-
 	while((c = MEM_READ8(me->mem, addr++))){
-		if(c == 'd' && percent)
-			printf("%d", Cpu_Pop(cpu));
+		if(c == '%'){ 
+			char fmt[64] = {'%', 0};
+			char* fp = fmt + 1;
+			bool done = false;
 
-		if(c == 'x' && percent)
-			printf("%x", Cpu_Pop(cpu));
-		
-		if(c == 'c' && percent)
-			printf("%c", Cpu_Pop(cpu));
+			for(int i = 0; i < sizeof(fmt); i++){
+				char c = MEM_READ8(me->mem, addr++);
+				if(!c){
+					LogW("unterminated formatting in string: %s", fmt);
+					goto ret;
+				}
 
-		if(c == 's' && percent)
-			printf("%s", MEM_READ_PTR(me->mem, Cpu_Pop(cpu)));
+				*(fp++) = c;
+				switch(c){
+					case 'd': 
+					case 'x': 
+					case 'c': printf(fmt, Cpu_Pop(cpu)); done = true; break;
+					case 's': printf(fmt, MEM_READ_PTR(me->mem, Cpu_Pop(cpu))); done = true; break;
+					case '%': done = true; break;
+					default: break;
+				}
 
-		if(!percent && c != '%'){
+				if(done) break;
+			}
+		}else{
 			fputc(c, stdout);
 		}
-
-		percent = c == '%';
 	}
+
+	ret:
+	fflush(stdout);
 }
 
 HyperMachine* HM_Create(int w, int h, double frameRate, uint8_t* display, bool debug, int freq)

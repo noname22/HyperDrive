@@ -4,13 +4,13 @@ static const char* dinsNames[] = DINSNAMES;
 static const char* valNames[] = VALNAMES;
 
 // Assembler directives
-#define AD_NUM (AD_Dw + 1)
+#define AD_NUM (AD_Dd + 1)
 #define AD2INS(_n) (-2 - (_n))
 #define INS2AD(_n) (-(_n) - 2)
 
-typedef enum                           { AD_Org, AD_Const, AD_Reserve, AD_Fill, AD_IncBin, AD_Include, AD_Macro, AD_End, AD_Dat, AD_Dw } AsmDir;
-static const char* adNames[AD_NUM] =   { ".org", ".const", ".reserve", ".fill", ".incbin", ".include",  "macro", "end", "dat",  ".dw"  };
-int                adNumArgs[AD_NUM] = {    1,       2,        1,         2,        1,          1,         -1,     0,     -1,    -1    };
+typedef enum                           { AD_Org, AD_Const, AD_Reserve, AD_Fill, AD_IncBin, AD_Include, AD_Macro, AD_End, AD_Db, AD_Dw,  AD_Dd } AsmDir;
+static const char* adNames[AD_NUM] =   { ".org", ".const", ".reserve", ".fill", ".incbin", ".include",  "macro", "end", ".db",  ".dw", ".dd"  };
+int                adNumArgs[AD_NUM] = {    1,       2,        1,         2,        1,          1,         -1,     0,     -1,    -1,     -1   };
 
 bool StrEmpty(const char* str)
 {
@@ -262,16 +262,20 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 					(toknum <= adNumArgs[ad] && toknum + 1 >= adNumArgs[ad]),
 					"%s expects %d arguments", adNames[ad], adNumArgs[ad]);
 
-				// .DW / DAT
-				// TODO fix .DB, .DW, .DD
-			 	if(ad == AD_Dw || ad == AD_Dat){
-					LogD(".dw data");
+				// .dw, .dl, .dd
+			 	if(ad == AD_Db || ad == AD_Dw || ad == AD_Dd){
+					#define WriteN(__val)\
+						if(ad == AD_Db) Write8(__val) \
+						else if(ad == AD_Dw) Write16(__val) \
+						else if(ad == AD_Dd) Write32(__val) 
+
+					LogD(".db/.dw/.dd data");
 					// List of characters on the "string" format
 					if(token[0] == '"'){
 						LAssert(ENDSWITH(token, '"'), "expected \"");
 						int len = strlen(token) - 2;
 						for(int i = 0; i < len; i++){
-							Write8(token[i + 1]);
+							WriteN(token[i + 1]);
 							LogD("%c", token[i + 1]);
 						}
 					}
@@ -281,9 +285,10 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 						bool isLiteral = false;
 						uint32_t lit = ParseLiteral(me, token, &isLiteral, false);
 						if(isLiteral){
-							Write32(lit);
+							WriteN(lit);
 						}else{
 							// A label
+							LAssertError(ad == AD_Dd, "labels can only be written in a double word data block (.dd)");
 							Labels_Get(me->labels, token, addr, addr - wrote, me->currentFile, me->lineNumber);
 							// Write a placeholder address
 							Write32(0);

@@ -96,5 +96,5 @@ start:
 
 		set.l pc, loop
 
-msg: .dw      "test", 10, 0
+msg: .db      "test", 10, 0
 rnd: .incbin  "rnd.dat"

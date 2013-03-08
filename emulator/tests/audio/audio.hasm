@@ -47,4 +47,4 @@ start:
 		set.l pc, loop
 
 sample:     .incbin "sample.raw"
-sample_end: .dw 0
+sample_end: .dd 0
