@@ -69,10 +69,12 @@ void Apu_HandleChannel(Apu* me, int chnNum, int16_t* stream, int nSamples)
 	float tt = (float)freq / (float)APU_RATE;
 	float t = chn->ppBackwards ? -tt : tt;
 
-	int8_t vol = MEM_READ8(me->mem, addr); addr += 1;
+	uint8_t vol = MEM_READ8(me->mem, addr); addr += 1;
 	if(vol != chn->vol){
 		chn->vol = vol;
 		chn->logVol = log10f((float)vol / 255.0f * 9 + 1);
+		LogD("logVol %f", chn->logVol);
+		LogD("vol %d", vol);
 	}
 
 	float pan = (float)(MEM_READ8(me->mem, addr)) / 255.0f; addr += 1;
@@ -99,10 +101,10 @@ void Apu_HandleChannel(Apu* me, int chnNum, int16_t* stream, int nSamples)
 
 		float smp;
 		if(n16b)  smp = (int16_t)MEM_READ16(me->mem, (smpPtr + ((uint32_t)pos * 2)));
-		else      smp = (float)((int8_t)MEM_READ8(me->mem, (smpPtr + (uint32_t)pos)) * 255.0f);
+		else      smp = (float)((int8_t)MEM_READ8(me->mem, (smpPtr + (uint32_t)pos)) * 256.0f);
 
-		stream[i * 2] += smp * vol * pan;
-		stream[i * 2 + 1] += smp * vol * (1.0 - pan);
+		stream[i * 2] += smp * chn->logVol * pan;
+		stream[i * 2 + 1] += smp * chn->logVol * (1.0 - pan);
 
 		pos += t;
 	}
