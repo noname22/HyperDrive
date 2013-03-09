@@ -17,7 +17,7 @@
 .const mp_playing_pat  0x34
 .const mp_curr_pos_ptr 0x38
 
-.const mp_track_size   0x4c
+.const mp_track_size   0x3c
 
 ; playing note
 ;.const mp_curr_pat    0x38
@@ -479,6 +479,8 @@ mpt_pattern_msg: .db "[%02x(%02x)/%02x %02x]", 10, 0
 
 modplayer_tick:
 	jsr push_all
+
+	set.l x, [mp_curr_pos_ptr+a]
 	
 	; A pointer to the first channel's current playing data
 	set.l j, a
