@@ -16,6 +16,7 @@
 .const mp_spd          0x30
 .const mp_playing_pat  0x34
 
+; playing note
 ;.const mp_curr_pat    0x38
 ;.const mp_pat_ptr     0x3c
 ;.const mp_chn_0       0x40
@@ -23,7 +24,8 @@
 ;.const mp_curr_pat    0x48
 ;.const mp_pat_ptr     0x4c
 
-.const mp_samples     0x100
+.const mp_samples_idx1 0x0D0 ; // 1-indexed pointer to samples
+.const mp_samples      0x100
 
 ; sample structure
 .const mps_sizeof     0x30
@@ -34,6 +36,17 @@
 .const mps_vol        0x0C
 .const mps_loopstart  0x10
 .const mps_replen     0x14
+
+.const mp_channels    0x800
+
+;channel structure
+.const mpc_sizeof         0x20
+
+.const mpc_ins            0x00
+.const mpc_effect         0x04
+.const mpc_effect_param   0x08
+.const mpc_order          0x0C
+.const mpc_hw_chn         0x10
 
 ; constants
 .const mp_magic_pal 7093789 ; "magic number" for PAL timing, period/freqency divisor
@@ -257,13 +270,35 @@ modplayer_init:
 	; set default playback speed to 6
 	set.l [mp_spd+x], 3
 
-	set.l pc, pop
+	; set up the channel structure's mapping to hardware channels
+	; A pointer to the first hardware channel to use in z
+	set.l z, [mp_chn_0+x]
 
-; print a note
-;   b -> instrument number
-;   c -> order/note
-;   j -> effect param
-;   y -> effect number
+	; Loop through the channels
+	set.l i, 0
+	
+	; A pointer to the channel structure
+	set.l j, x
+	add j, mp_channels
+		
+	mpi_channel_loop:
+		set.l [mpc_hw_chn+j], z
+		
+		set.l push, x
+		set.l push, mp_xmsg
+		sys SYS_PRINT
+	
+		; step to the next channel data object
+		add j, mpc_sizeof
+
+		; step to the next hardware channel
+		add z, APU_CHN_SIZE
+
+		add i, 1
+		ifn i, [mp_num_chn+x]
+			set.l pc, mpi_channel_loop
+
+	set.l pc, pop
 
 mp_order_tab:
 .dd 1712,1616,1525,1440,1357,1281,1209,1141,1077,1017, 961, 907
@@ -289,71 +324,60 @@ mp_effect_tab:
 
 mpp_note_msg: .db "(% 4d) %s %02x %c%02x | ", 0
 
-modplayer_print_note:
-	;set.l push, x
-	set.l push, i
+; print a note
+;   a -> mod player object pointer
+;   j -> current channel playing data struct pointer
 
-	set.l i, 0
+modplayer_print_note:
+	set.l b, 0
 
 	mpp_loop:
-		ifg c, [mp_order_tab+i]
+		ifg [mpc_order+j], [mp_order_tab+b]
 			set.l pc, mpp_break
 
-		add i, 4
-		ifn i, 336
+		add b, 4
+		ifn b, 336
 			set.l pc, mpp_loop
 
 	mpp_break:
 
-	ifn i, 336
-		sub i, 4
+	ifn b, 336
+		sub b, 4
 
-	add i, mp_note_tab
+	add b, mp_note_tab
 
-	set.l push, j ; effect param
+	set.l y, [mpc_effect+j]
+
+	set.l push, [mpc_effect_param+j]
 	set.l push, [mp_effect_tab+y] ; effect
-	set.l push, b ; ins num
-	set.l push, i
-	set.l push, c
+	set.l push, [mpc_ins+j]
+	set.l push, b
+	set.l push, [mpc_order+j]
 	
 	set.l push, mpp_note_msg
 
 	sys SYS_PRINT
-	
 
-	set.l i, pop
-	;set.l x, pop
 	set.l pc, pop
 
 ; trigger a note
 ;   a -> mod player object pointer
-;   b -> instrument number
-;   c -> order/note
 ;   i -> channel number
-;   j -> effect param
-;   y -> effect number
-;   z -> current channel pointer
-;   ... wow
-
-empty_note_msg: .db "--- - -- - --- | ", 0
+;   j -> current channel playing data struct pointer
 
 modplayer_trigger_note:
-	jsr modplayer_print_note
-
 	; if there's no note, return
-	ife c, 0
+	ife [mpc_order+j], 0
 		set.l pc, pop
 
-	set.l push, x
-	set.l push, b
-
-	sub b, 1
+	; set z to to a pointer to the hardware channel
+	set.l z, [mpc_hw_chn+j]
 
 	; get a pointer to the sample/instrument structure
-	set.l x, mps_sizeof ; sizeof sample struct
-	mul x, b            ; ... times instrument number
-	add x, mp_samples   ; ... plus offset of the samples into the mp structure
-	add x, a            ; ... plus the object location -> x contains the sample location
+	set.l x, mps_sizeof    ; sizeof sample struct
+	mul x, [mpc_ins+j]     ; ... times instrument number
+	add x, mp_samples_idx1 ; ... plus offset of the samples into the mp structure (1 indexed, instruments begin at 1)
+	add x, a               ; ... plus the object location -> x contains the sample location
 
 	; set the sample pointer
 	set.l [APU_O_SPTR+z], [mps_smpptr+x]
@@ -387,43 +411,26 @@ modplayer_trigger_note:
 
 	mptn_continue:
 
-	;set.l push, [APU_O_FLAGS+z]
-	;set.l push, mp_dmsg
-	;sys SYS_PRINT
-
 	; set the volume
 	set.b [APU_O_VOL+z], [mps_vol+x]
 
 	; set pan
-	set.l push, i
-
-	and i, 1
-	ife i, 1
+	and b, 1
+	ife b, 1
 		set.b [APU_O_PAN+z], 165
-	ife i, 0
+	ife b, 0
 		set.b [APU_O_PAN+z], 89
-
-	set.l i, pop
 
 	; set playback frequency
 	;   7093789.2 / (period * 2)
 
-	set.l push, c
+	set.l c, [mpc_order+j]
 
 	mul c, 2
 	set.l b, mp_magic_pal
 	div b, c
 
 	set.l [APU_O_FREQ+z], b
-
-	;set.l push, b
-	;set.l push, mp_dmsg
-	;sys SYS_PRINT
-
-	set.l c, pop
-
-	set.l b, pop
-	set.l x, pop
 
 	set.l pc, pop
 
@@ -462,80 +469,79 @@ modplayer_tick:
 	; Offset into pattern pointer to get to current note data
 	set.l x, [mp_pat_ptr+a]
 	add x, y
-
-	; A pointer to the first hardware channel to use in z
-	set.l z, [mp_chn_0+a]
+	
+	; A pointer to the first channel's current playing data
+	set.l j, a
+	add j, mp_channels
 
 	; Loop through the channels
 	set.l i, 0
-	
+
 	mp_channel_loop:
-		;set.b push, [x]
-		;set.l push mp_xmsg
-		;sys SYS_PRINT
-		;set.b push, [1+x]
-		;set.l push mp_xmsg
-		;sys SYS_PRINT
-		;set.b push, [2+x]
-		;set.l push mp_xmsg
-		;sys SYS_PRINT
-		;set.b push, [3+x]
-		;set.l push mp_xmsg
-		;sys SYS_PRINT
+		; parse the note if delay is 0
+		ifn [mp_delay+a], 0
+			set.l pc, mp_apply_effects
 
-		; 2 bytes instrument / period
-		; highest 4 bits in LE 16b word, highest nibble in instrument number -> b
-		set.b b, [x]
-		and b, 0xf0
+		mp_parse_note:
+			; 2 bytes instrument / period
+			; highest 4 bits in LE 16b word, highest nibble in instrument number -> b
+			set.b b, [x]
+			and b, 0xf0
 
-		; mask out so that only the 4 lowest bits remain, and shift them up to highest
-		; of the 12 bit word that is the period
-		set.b c, [x]
-		and c, 0xf
-		shl c, 8
-		add x, 1
+			; mask out so that only the 4 lowest bits remain, and shift them up to highest
+			; of the 12 bit word that is the period
+			set.b c, [x]
+			and c, 0xf
+			shl c, 8
+			add x, 1
 
-		; read lower 8 bits of word into y and or together with
-		; the higher 4 bits in c
-		; c now contains order/note
-		set.b y, [x]
-		bor c, y
+			; read lower 8 bits of word into y and or together with
+			; the higher 4 bits in c
+			; c now contains order/note
+			set.b y, [x]
+			bor c, y
 
-		add x, 1
+			set.l [mpc_order+j], c
 
-		; 1 bytes instrument / effect
-		; highest 4 bits is lower nibble in instrument number
-		; grab to y, shift down and or together with the higher 
-		; instrument nibble -> b now contains instrument
-		set.b y, [x]
-		and y, 0xf0
-		shr y, 4
-		bor b, y
-		
-		; read lower nibble -> y now contains effect
-		set.b y, [x]
-		and y, 0xf 
-		
-		add x, 1
+			add x, 1
 
-		; read effect parameter into j
-		set.b j, [x]
-		add x, 1
+			; 1 bytes instrument / effect
+			; highest 4 bits is lower nibble in instrument number
+			; grab to y, shift down and or together with the higher 
+			; instrument nibble -> b now contains instrument
+			set.b y, [x]
+			and y, 0xf0
+			shr y, 4
+			bor b, y
 
-		; print parsed note
-		;set.l push, j ; effect param
-		;set.l push, y ; effect number
-		;set.l push, b ; instrument number
-		;set.l push, c ; order/note
-		;set.l push, mpt_note_msg
-		;sys SYS_PRINT
-		
-		; trigger the note if delay is 0
-		ife [mp_delay+a], 0
+			set.l [mpc_ins+j], b
+			
+			; read lower nibble -> y now contains effect
+			set.b y, [x]
+			and y, 0xf 
+
+			set.l [mpc_effect+j], y
+			
+			add x, 1
+
+			; read effect parameter
+			set.b [mpc_effect_param+j], [x]
+			add x, 1
+
+			set.l push, x
+
+			; print the note
+			jsr modplayer_print_note
+
+			; trigger the note
 			jsr modplayer_trigger_note
 
-		; step to the next hardware channel
-		add z, APU_CHN_SIZE
+			set.l x, pop
+
+		mp_apply_effects:
+
+		; step to the next channel data object
+		add j, mpc_sizeof
 
 		add i, 1
 		ifn i, [mp_num_chn+a]
