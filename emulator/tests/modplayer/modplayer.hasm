@@ -271,7 +271,7 @@ modplayer_init:
 			set.l pc, parse_sample_ptr_loop
 
 	; set default playback speed to 6
-	set.l [mp_spd+x], 3
+	set.l [mp_spd+x], 6
 
 	; set up the channel structure's mapping to hardware channels
 	; A pointer to the first hardware channel to use in z

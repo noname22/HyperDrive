@@ -205,11 +205,11 @@ int Emu_Run(Emu* me)
 
 		Emu_ScaleBlit(me, screen, origSurface, mult);
 
-		int frameTime = SDL_GetTicks() - timer;
-		DrawText(screen, 10, 10, white, "frametime: %d", frameTime);
+		//DrawText(screen, 10, 10, white, "frametime: %d", frameTime);
 
 		SDL_Flip(screen);
 
+		int frameTime = SDL_GetTicks() - timer;
 		if(frameTime < 16){
 			SDL_Delay(16 - frameTime);
 		}
