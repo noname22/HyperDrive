@@ -301,6 +301,7 @@ modplayer_init:
 	set.l [mp_track_size+x], 4
 	mul [mp_track_size+x], [mp_num_chn+x]
 
+	set.l a, x
 	jsr modplayer_calc_patpos_ptr
 
 	set.l pc, pop
@@ -470,6 +471,8 @@ modplayer_calc_patpos_ptr:
 	add x, y
 
 	set.l [mp_curr_pos_ptr+a], x
+
+	set.l pc, pop
 
 ; update the player
 ;   a -> mod player object pointer
