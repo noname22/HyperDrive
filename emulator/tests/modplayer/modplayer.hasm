@@ -2,7 +2,7 @@
 .const mp_chn_0        0x00
 .const mp_file         0x04
 .const mp_curr_pat     0x08
-.const mp_pat_ptr      0x0c
+.const mp_pats_ptr     0x0c
 .const mp_sng_len      0x10
 .const mp_restart_at   0x14
 .const mp_seq_ptr      0x18
@@ -15,6 +15,9 @@
 .const mp_delay        0x2c
 .const mp_spd          0x30
 .const mp_playing_pat  0x34
+.const mp_curr_pos_ptr 0x38
+
+.const mp_track_size   0x4c
 
 ; playing note
 ;.const mp_curr_pat    0x38
@@ -229,7 +232,7 @@ modplayer_init:
 	add j, 4
 
 	; Save a pointer to the patterns
-	set.l [mp_pat_ptr+x], j
+	set.l [mp_pats_ptr+x], j
 
 	; Set number of channels to 4 for now
 	set.l [mp_num_chn+x], 4
@@ -284,10 +287,6 @@ modplayer_init:
 	mpi_channel_loop:
 		set.l [mpc_hw_chn+j], z
 		
-		set.l push, x
-		set.l push, mp_xmsg
-		sys SYS_PRINT
-	
 		; step to the next channel data object
 		add j, mpc_sizeof
 
@@ -297,6 +296,12 @@ modplayer_init:
 		add i, 1
 		ifn i, [mp_num_chn+x]
 			set.l pc, mpi_channel_loop
+
+	; calculate track/line size
+	set.l [mp_track_size+x], 4
+	mul [mp_track_size+x], [mp_num_chn+x]
+
+	jsr modplayer_calc_patpos_ptr
 
 	set.l pc, pop
 
@@ -434,15 +439,10 @@ modplayer_trigger_note:
 
 	set.l pc, pop
 
-; update the player
+; calculates a pointer to the current pattern position
 ;   a -> mod player object pointer
 
-mpt_note_msg:    .db "note: %d %x %x %x", 10, 0
-mpt_pattern_msg: .db "[%02x(%02x)/%02x %02x]", 10, 0
-
-modplayer_tick:
-	jsr push_all
-
+modplayer_calc_patpos_ptr:
 	; Skip to current note. 
 	; Calculate pattern offset and put in y
 
@@ -463,12 +463,22 @@ modplayer_tick:
 	add y, [mp_pat_pos+a]
 
 	; ... times track size
-	mul y, 4               ; 4 bytes per note
-	mul y, [mp_num_chn+a]  ; channels * notesize bytes per track
+	mul y, [mp_track_size+a]
 
 	; Offset into pattern pointer to get to current note data
-	set.l x, [mp_pat_ptr+a]
+	set.l x, [mp_pats_ptr+a]
 	add x, y
+
+	set.l [mp_curr_pos_ptr+a], x
+
+; update the player
+;   a -> mod player object pointer
+
+mpt_note_msg:    .db "note: %d %x %x %x", 10, 0
+mpt_pattern_msg: .db "[%02x(%02x)/%02x %02x]", 10, 0
+
+modplayer_tick:
+	jsr push_all
 	
 	; A pointer to the first channel's current playing data
 	set.l j, a
@@ -561,6 +571,9 @@ modplayer_tick:
 
 	; reset note delay timer to speed
 	set.l [mp_delay+a], [mp_spd+a]
+
+	; point current position pointer to next position
+	add [mp_curr_pos_ptr+a], [mp_track_size+a]
 	
 	; if pos is 63, jump to next pattern
 	ife [mp_pat_pos+a], 63
@@ -584,10 +597,13 @@ modplayer_tick:
 
 		add [mp_curr_pat+a], 1
 
+		jsr modplayer_calc_patpos_ptr
+
 		set.l pc, mpt_return
 
 	mpt_loop_song:
 		set.l [mp_curr_pat+a], [mp_restart_at+a]
+		jsr modplayer_calc_patpos_ptr
 		set.l pc, mpt_return
 	
 	mpt_dec_timer:
