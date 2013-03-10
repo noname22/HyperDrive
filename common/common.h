@@ -25,6 +25,7 @@ int ReadFileAlloc(uint8_t** data, const char* filename);
 long FileSize(FILE* f);
 
 char* StrReplace(char* target, const char* str, const char* what, const char* with);
+char* StrStrip(char* target, const char* str);
 int LoadRamMax(uint8_t* rom, const char* filename, uint16_t lastAddr);
 
 bool OpHasNextWord(uint16_t v);

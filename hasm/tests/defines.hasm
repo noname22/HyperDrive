@@ -1,0 +1,4 @@
+.define test a
+
+set.l test, 1
+set.l b, test

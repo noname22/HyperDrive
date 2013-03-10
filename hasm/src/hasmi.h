@@ -33,8 +33,12 @@ void Macro_AddArg(Macro* me, const char* arg);
 bool Macro_AddLine(Macro* me, Hasm* hasm, const char* line);
 Reader* Macro_GetReader(Macro* me);
 
-typedef struct { char* searchReplace[2]; } Define;
-Vector(Define);
+typedef struct MacroCall MacroCall;
+MacroCall* MacroCall_Create(Macro* macro);
+void MacroCall_PushArgs(MacroCall* me, Defines* defs);
+void MacroCall_PopArgs(MacroCall* me, Defines* defs);
+void MacroCall_AddCallArg(MacroCall* me, const char* arg); 
+void MacroCall_Destroy(MacroCall** me);
 
 typedef struct
 {
@@ -59,8 +63,7 @@ typedef struct {
 
 	LabelRefs references;
 } Label;
-
-Vector(Label); 
+Vector(Label);
 
 Labels* Labels_Create();
 Label* Labels_Lookup(Labels* me, const char* label);
@@ -79,5 +82,10 @@ void Reader_Destroy(Reader** me);
 bool GetLine(Hasm* me, FILE* f, char* buffer);
 char* GetToken(Hasm* me, char* buffer, char* token);
 uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth);
+
+Defines* Defines_Create();
+void Defines_Push(Defines* me, const char* search, const char* replace);
+void Defines_Pop(Defines* me, int num);
+char* Defines_Replace(Defines* me, char* buffer, bool partials);
 
 #endif

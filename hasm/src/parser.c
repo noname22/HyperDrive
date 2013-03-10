@@ -8,9 +8,9 @@ static const char* valNames[] = VALNAMES;
 #define AD2INS(_n) (-2 - (_n))
 #define INS2AD(_n) (-(_n) - 2)
 
-typedef enum                           { AD_Org, AD_Const, AD_Reserve, AD_Fill, AD_IncBin, AD_Include, AD_MBegin, AD_MEnd, AD_Db, AD_Dw,  AD_Dd } AsmDir;
-static const char* adNames[AD_NUM] =   { ".org", ".const", ".reserve", ".fill", ".incbin", ".include", ".mbegin",  ".mend", ".db",  ".dw", ".dd"  };
-int                adNumArgs[AD_NUM] = {    1,       2,        1,         2,        1,          1,         -1,         0,     -1,    -1,     -1   };
+typedef enum                           { AD_Org, AD_Const, AD_Reserve, AD_Fill, AD_IncBin, AD_Include, AD_Define, AD_MBegin, AD_MEnd, AD_Db, AD_Dw,  AD_Dd } AsmDir;
+static const char* adNames[AD_NUM] =   { ".org", ".const", ".reserve", ".fill", ".incbin", ".include", ".define", ".macro",    ".end", ".db",  ".dw", ".dd"  };
+int                adNumArgs[AD_NUM] = {    1,       2,        1,         2,        1,          1,        -1,         -1,         0,     -1,    -1,     -1   };
 
 bool StrEmpty(const char* str)
 {
@@ -82,12 +82,12 @@ DVals ParseOperand(Hasm* me, const char* tok, unsigned int* nextWord, char** lab
 
 	*label = NULL;
 
-	// POP / [SP++], PEEK / [SP], PUSH / [--SP]
-	if(!strcmp(token, "pop") || !strcmp(token, "[sp++]")) return DV_Pop;
-	if(!strcmp(token, "peek") || !strcmp(token, "[sp]")) return DV_Peek;
-	if(!strcmp(token, "push") || !strcmp(token, "[--sp]")) return DV_Push;
+	// pop, peek, push 
+	if(!strcmp(token, "pop")) return DV_Pop;
+	if(!strcmp(token, "peek")) return DV_Peek;
+	if(!strcmp(token, "push")) return DV_Push;
 	
-	// SP, PC
+	// sp, pc, o
 	if(!strcmp(token, "sp")) return DV_SP;
 	if(!strcmp(token, "pc")) return DV_PC;
 	if(!strcmp(token, "o")) return DV_O;
@@ -239,6 +239,7 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 		char* opLabels[2] = {NULL, NULL};
 		char* constName;
 		Macro* parsingMacroCallTo = NULL;
+		MacroCall* parsingMacroCall = NULL;
 
 		uint32_t tmp = 0;
 		
@@ -263,6 +264,9 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 			if(StrEmpty(token)) break;
 
 			LogD("token (%d): '%s'", toknum, token);
+
+			// Handle defines that are not embedded in operands
+			Defines_Replace(me->defines, token, false);
 
 			// A label, add it and continue	
 			if(toknum == 0 && ENDSWITH(token, ':')) {
@@ -371,6 +375,19 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 					Reader_Destroy(&r);
 				}
 
+				// .define
+				else if(ad == AD_Define){
+					// XXX ".define" should produce an error
+					LogD("define");
+					if(toknum == 1){
+						LogD("define: %s = '%s'", token, line);
+						Defines_Push(me->defines, token, line);
+						
+						// break out of the current line parsing loop, continuing with the next line
+						break;
+					}
+				}
+
 				// .macro
 				else if(ad == AD_MBegin){
 					LogD("begin macro");
@@ -396,7 +413,7 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 
 				}
 
-				LAssertError(ad != AD_MEnd, ".mend without .mstart");
+				LAssertError(ad != AD_MEnd, ".end without .macro");
 			}
 
 			// An instruction, assembly directive or macro call
@@ -423,6 +440,7 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 				// Macro calls
 				parsingMacroCallTo = GetMacro(me, token);
 				if(parsingMacroCallTo){
+					parsingMacroCall = MacroCall_Create(parsingMacroCallTo);
 					LogD("parsing a macro call");
 					goto done_searching;
 				}
@@ -441,13 +459,29 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 				}
 
 				else if(!strcmp(token, ")")){
+					// call the macro
+					
+					
+					MacroCall_PushArgs(parsingMacroCall, me->defines);
+
 					Reader* r = Macro_GetReader(parsingMacroCallTo);
 					addr = Assemble(me, r, addr, depth + 1);
 					Reader_Destroy(&r);
 					parsingMacroCallTo = NULL;
+
+					MacroCall_PopArgs(parsingMacroCall, me->defines);
+
+					MacroCall_Destroy(&parsingMacroCall);
+				}
+
+				else {
+					MacroCall_AddCallArg(parsingMacroCall, token);
 				}
 			}
 			else if( toknum == 1 || toknum == 2 ){
+				// do a search replace on the operand, replaces eg. [search] with [replace]
+				Defines_Replace(me->defines, token, true);
+
 				operands[toknum - 1] = ParseOperand(me, token, nextWord + toknum - 1, opLabels + toknum - 1);
 				numOperands++;
 			}

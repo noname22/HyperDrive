@@ -18,6 +18,7 @@ Hasm* Hasm_Create()
 	LAssert(me, "Could not allocate RAM for assembler");
 	
 	me->labels = Labels_Create();
+	me->defines = Defines_Create();
 
 	return me;
 }

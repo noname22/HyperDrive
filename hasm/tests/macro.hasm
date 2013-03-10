@@ -1,0 +1,10 @@
+.define set set.l
+
+label:
+.macro hello(arg1, arg2, arg3)
+	set arg1, 0
+	set arg2, 1
+	add [arg3+a], a
+.end
+
+hello(a, b, label)

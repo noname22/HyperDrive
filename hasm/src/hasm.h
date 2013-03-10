@@ -14,6 +14,7 @@ typedef struct Macro Macro;
 typedef Macro* MacroPtr;
 typedef Vector(MacroPtr) MacroVec;
 typedef struct Reader Reader;
+typedef struct Defines Defines;
 
 typedef struct {
 	char* baseDir;
@@ -24,6 +25,7 @@ typedef struct {
 	Reader* reader;
 
 	Labels* labels;
+	Defines* defines;
 	MacroVec macros;
 
 	FILE* debugFile;

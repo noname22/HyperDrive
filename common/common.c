@@ -75,6 +75,30 @@ long FileSize(FILE* f)
 	return ret;
 }
 
+char* StrStrip(char* target, const char* str)
+{
+	int start = 0, end = strlen(str);
+
+	for(int i = 0; i < strlen(str); i++){
+		if(str[i] == '\t' || str[i] == ' ')
+			start++;
+		else
+			break;
+	}
+	
+	for(int i = strlen(str) - 1; i >= 0; i--){
+		if(str[i] == '\t' || str[i] == ' ')
+			end--;
+		else
+			break;
+	}
+
+	strncpy(target, str + start, end - start);
+	target[end - start] = 0;
+
+	return target;
+}
+
 char* StrReplace(char* target, const char* str, const char* what, const char* with)
 {
 	const char* ss = strstr(str, what);
