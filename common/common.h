@@ -12,6 +12,11 @@
 #include "log.h"
 #include "cvector.h"
 
+#define HMIN(_a, _b) ((_a) < (_b) ? (_a) : (_b))
+#define HMAX(_a, _b) ((_a) > (_b) ? (_a) : (_b))
+
+#define HCLAMP(_v, _min, _max) HMAX( HMIN((_v), (_max)), (_min) )
+
 extern int logLevel;
 typedef enum {DBO_LittleEndian, DBO_BigEndian } DByteOrder;
 
@@ -26,6 +31,10 @@ long FileSize(FILE* f);
 
 char* StrReplace(char* target, const char* str, const char* what, const char* with);
 char* StrStrip(char* target, const char* str);
+int StrIndexOfChr(const char* s, int c);
+char* StrSubStr(char* target, const char* str, int from, int to);
+char* StrReplaceRange(char* target, const char *str, int from, int len, const char* with);
+
 int LoadRamMax(uint8_t* rom, const char* filename, uint16_t lastAddr);
 
 bool OpHasNextWord(uint16_t v);

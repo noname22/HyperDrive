@@ -9,15 +9,6 @@
 	return false;
 }*/
 
-static int IndexOfChr(const char* s, int c)
-{
-	char* ptr = 0;
-	if((ptr = strchr(s, c)) != NULL)
-		return (intptr_t)ptr - (intptr_t)s;
-
-	return -1;
-}
-
 char* GetToken(Hasm* me, char* line, char* token)
 {
 	// skip spaces etc.
@@ -54,7 +45,7 @@ char* GetToken(Hasm* me, char* line, char* token)
 			if(expecting){
 				if(*line == expecting) expecting = 0;
 			}else{
-				if((idx = IndexOfChr(start, *line)) != -1)
+				if((idx = StrIndexOfChr(start, *line)) != -1)
 					expecting = end[idx];
 				else if(strchr(stop, *line)){
 					break;

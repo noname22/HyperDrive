@@ -3,8 +3,38 @@
 label:
 .macro hello(arg1, arg2, arg3)
 	set arg1, 0
-	set arg2, 1
+	set b, arg2
 	add [arg3+a], a
 .end
 
-hello(a, b, label)
+.macro goodbye(a1, a2)
+	uniq#whatever:
+		sub a, a
+		sub a, a
+	set pc, uniq#label1
+.end
+
+
+.macro Test2(a2, a3)
+	set a, a2
+	set b, a3
+.end
+
+.macro Test1(a1, a2)
+	Test2(a1, a2)
+	set pc, uniq#return
+	uniq#return:
+.end
+
+Test1(4, 6)
+
+;hello(b, 3, label)
+;hello(b, 2, 4)
+;goodbye(1, 2)
+;goodbye(0, 0)
+;goodbye(0, 0)
+;goodbye(0, 0)
+;goodbye(0, 0)
+;goodbye(0, 0)
+
+

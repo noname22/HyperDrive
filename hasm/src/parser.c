@@ -194,8 +194,15 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 	Reader* saveReader = me->reader;
 	me->reader = reader;
 
-	char buffer[MAX_STR_SIZE];
-	char token[MAX_STR_SIZE];
+	char buffer[MAX_STR_SIZE] = {0};
+	char token[MAX_STR_SIZE] = {0};
+
+	// Save the "uniq" define of the "parent" (depth - 1) Assembler
+	int saveUniq = me->uniq;
+	me->uniq = me->uniqCounter++;
+
+	sprintf(buffer, "%d_", me->uniq);
+	Defines_Set(me->defines, "uniq", buffer);
 
 	bool done = false;
 	int labelsAdded = 0;
@@ -265,8 +272,8 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 
 			LogD("token (%d): '%s'", toknum, token);
 
-			// Handle defines that are not embedded in operands
-			Defines_Replace(me->defines, token, false);
+			// Handle defines 
+			Defines_Replace(me->defines, token);
 
 			// A label, add it and continue	
 			if(toknum == 0 && ENDSWITH(token, ':')) {
@@ -381,7 +388,9 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 					LogD("define");
 					if(toknum == 1){
 						LogD("define: %s = '%s'", token, line);
-						Defines_Push(me->defines, token, line);
+
+						// XXX add hint where the first was defined
+						LAssertError(Defines_Push(me->defines, token, line), "redefinition of %s", token);
 						
 						// break out of the current line parsing loop, continuing with the next line
 						break;
@@ -479,9 +488,6 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 				}
 			}
 			else if( toknum == 1 || toknum == 2 ){
-				// do a search replace on the operand, replaces eg. [search] with [replace]
-				Defines_Replace(me->defines, token, true);
-
 				operands[toknum - 1] = ParseOperand(me, token, nextWord + toknum - 1, opLabels + toknum - 1);
 				numOperands++;
 			}
@@ -513,6 +519,8 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 		}
 		
 		LAssertError(toknum - 1 == InsNumOps(insnum), "%s expects %d operands (not %d)", dinsNames[insnum], InsNumOps(insnum), toknum - 1);
+		LogD("insnum: %d mods: %d type: %d", insnum, DINS_MODS_TARGET(insnum), operands[0]);
+
 		LAssertError(operands[0] != DV_NextWord || !DINS_MODS_TARGET(insnum), "Can't assign literal (did you mean [literal]?)");
 
 		// Write to output
@@ -556,6 +564,10 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 	} while (done);
 
 	me->reader = saveReader;
+	
+	me->uniq = saveUniq;
+	sprintf(buffer, "%d_", me->uniq);
+	Defines_Set(me->defines, "uniq", buffer);
 
 	return addr;
 }

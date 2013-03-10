@@ -56,7 +56,8 @@
 		Vector_Add((vec), (src).elems[i])\
 	}
 
-#define Vector_ForEach(vec, _iterator) for(_iterator = (vec).elems; (_iterator) < (vec).elems + (vec).count; (_iterator)++)
+#define Vector_ForEach(vec, _iterator) for((_iterator) = (vec).elems; (_iterator) < (vec).elems + (vec).count; (_iterator)++)
+#define Vector_ReverseForEach(vec, _iterator) for((_iterator) = (vec).elems + ((vec).count - 1); (_iterator) >= (vec).elems; (_iterator)--)
 
 #define Vector_Free(vec) free((vec).elems)
 

@@ -20,6 +20,8 @@ Hasm* Hasm_Create()
 	me->labels = Labels_Create();
 	me->defines = Defines_Create();
 
+	Vector_Init(me->macros, MacroPtr);
+
 	return me;
 }
 

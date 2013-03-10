@@ -72,6 +72,11 @@ void Labels_Define(Labels* me, Hasm* d, const char* label, uint32_t address, con
 uint32_t Labels_Get(Labels* me, const char* label, uint32_t current, uint32_t insAddr, const char* filename, int lineNumber);
 void Labels_Replace(Labels* me, uint8_t* ram);
 
+int Defines_GetCount(Defines* me);
+void Defines_Print(Defines* me);
+const char* Defines_Get(Defines* me, const char* name);
+void Defines_Set(Defines* me, const char* search, const char* replace);
+
 Reader* Reader_CreateFromFile(const char* filename);
 Reader* Reader_CreateFromBuffer(char* buffer, int len, const char* name, int startLineNum);
 int Reader_GetLineNumber(Reader* me);
@@ -84,8 +89,8 @@ char* GetToken(Hasm* me, char* buffer, char* token);
 uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth);
 
 Defines* Defines_Create();
-void Defines_Push(Defines* me, const char* search, const char* replace);
+bool Defines_Push(Defines* me, const char* search, const char* replace);
 void Defines_Pop(Defines* me, int num);
-char* Defines_Replace(Defines* me, char* buffer, bool partials);
+char* Defines_Replace(Defines* me, char* buffer);
 
 #endif

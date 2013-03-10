@@ -43,7 +43,7 @@ void Macro_AddArg(Macro* me, const char* arg)
 
 Reader* Macro_GetReader(Macro* me)
 {
-	return Reader_CreateFromBuffer(me->str.elems, me->str.count, me->filename, me->sourceLine - 1);
+	return Reader_CreateFromBuffer(me->str.elems, me->str.count, me->filename, me->sourceLine);
 }
 
 struct MacroCall {
@@ -67,13 +67,21 @@ void MacroCall_PushArgs(MacroCall* me, Defines* defs)
 	LAssert(me->macro->args.count == me->args.count, "macro %s expects %d arguments, %d given", 
 		me->macro->name, me->macro->args.count, me->args.count);
 
+	LogD("before push args: %d", Defines_GetCount(defs));
+	Defines_Print(defs);
+
 	for(int i = 0; i < me->args.count; i++)
 		Defines_Push(defs, me->macro->args.elems[i], me->args.elems[i]);
+	
+	LogD("after push args: %d", Defines_GetCount(defs));
+	Defines_Print(defs);
 }
 
 void MacroCall_PopArgs(MacroCall* me, Defines* defs)
 {
 	Defines_Pop(defs, me->args.count);
+	LogD("after pop args: %d", Defines_GetCount(defs));
+	Defines_Print(defs);
 }
 
 void MacroCall_AddCallArg(MacroCall* me, const char* arg)

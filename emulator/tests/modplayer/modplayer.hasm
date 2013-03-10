@@ -63,6 +63,12 @@ mp_dmsg: .db "dec: %d", 10, 0
 mp_xmsg: .db "hex: 0x%x", 10, 0
 mp_newline: .db 10, 0
 
+.macro PrintHex(what)
+	set push, what
+	set push, mp_xmsg
+	sys SYS_PRINT
+.end
+
 ; parse a sapmle
 ;   a -> pointer to sample structure to write to
 ;   j -> file pointer 
@@ -75,6 +81,65 @@ mps_parsed_msg:
 	.db "  mps_vol:       %02x", 10
 	.db "  mps_loopstart: %04x", 10
 	.db "  mps_replen:    %04x", 10, 10, 0
+
+; calculates a pointer to the current pattern position
+;   obj -> mod player object pointer
+;   w1, w2, w3 -> working registers
+
+.macro modplayer_calc_patpos_ptr(obj, w1, w2, w3)
+	; Skip to current note. 
+	; Calculate pattern offset and put in w1
+
+	; get current pattern number from sequence and put in w2
+	set.l w2, [mp_seq_ptr+obj]  ; pointer to sequence
+	add w2, [mp_curr_pat+obj]   ; index into sequence
+	set.b w2, [w2]             ; read pattern number from sequence
+
+	set.l [mp_playing_pat+obj], w2
+
+	; Whole patterns size
+	set.l w1, 64              ; 64 tracks per pattern
+	
+	; ..times current pattern
+	mul w1, w2
+
+	; ...plus the current pos in the pattern
+	add w1, [mp_pat_pos+obj]
+
+	; ... times track size
+	mul w1, [mp_track_size+obj]
+
+	; Offset into pattern pointer to get to current note data
+	set.l w3, [mp_pats_ptr+obj]
+	add w3, w1
+
+	set.l [mp_curr_pos_ptr+obj], w3
+.end
+
+.macro mp_next_ptn(mp, w0, w1, w2)
+	; reset pos to 0
+	set.l [mp_pat_pos+mp], 0
+
+	set.l w0, [mp_num_pats+mp]
+	sub w0, 1
+
+	; if we're at the last pattern, loop to loop point
+	ife w0, [mp_curr_pat+mp]
+		set.l pc, uniq#loop_song
+
+	add [mp_curr_pat+mp], 1
+
+	modplayer_calc_patpos_ptr(mp, w0, w1, w2)
+
+	set.l pc, uniq#return
+
+	uniq#loop_song:
+		set.l [mp_curr_pat+mp], [mp_restart_at+mp]
+		modplayer_calc_patpos_ptr(mp, w0, w1, w2)
+
+	uniq#return:
+.end
+
 
 modplayer_parse_sample:
 	set.l push x
@@ -309,7 +374,7 @@ modplayer_init:
 	mul [mp_track_size+x], [mp_num_chn+x]
 
 	set.l a, x
-	jsr modplayer_calc_patpos_ptr
+	modplayer_calc_patpos_ptr(a, y, x, j)
 
 	set.l pc, pop
 
@@ -465,40 +530,6 @@ modplayer_trigger_note:
 
 	set.l pc, pop
 
-; calculates a pointer to the current pattern position
-;   a -> mod player object pointer
-
-modplayer_calc_patpos_ptr:
-	; Skip to current note. 
-	; Calculate pattern offset and put in y
-
-	; get current pattern number from sequence and put in j
-	set.l j, [mp_seq_ptr+a]  ; pointer to sequence
-	add j, [mp_curr_pat+a]   ; index into sequence
-	set.b j, [j]             ; read pattern number from sequence
-
-	set.l [mp_playing_pat+a], j
-
-	; Whole patterns size
-	set.l y, 64              ; 64 tracks per pattern
-	
-	; ..times current pattern
-	mul y, j
-
-	; ...plus the current pos in the pattern
-	add y, [mp_pat_pos+a]
-
-	; ... times track size
-	mul y, [mp_track_size+a]
-
-	; Offset into pattern pointer to get to current note data
-	set.l x, [mp_pats_ptr+a]
-	add x, y
-
-	set.l [mp_curr_pos_ptr+a], x
-
-	set.l pc, pop
-
 ; all effects
 ;   a -> mod player object
 ;   b -> hw channel
@@ -506,7 +537,7 @@ modplayer_calc_patpos_ptr:
 ;   i -> channel number
 ;   can modify y, c 
 
-mp_fx_preslide:
+.macro mp_fx_preslide()
 	; not on a new note (most accurate, at least compared to fast tracker)
 	ife [mp_delay+a], 0
 		set.l pc, pop
@@ -516,7 +547,7 @@ mp_fx_preslide:
 	; use previous param setting if it's 0
 	ife y, 0
 		set.l y, [mpc_last_param+j]
-	set.l pc, pop
+.end
 
 ; arpreggio
 mp_fx_0:
@@ -524,14 +555,14 @@ mp_fx_0:
 
 ; slide up
 mp_fx_1:
-	jsr mp_fx_preslide
+	mp_fx_preslide()
 	sub [mpc_last_order+j], y
 	jsr modplayer_apply_order
 	set.l pc, pop
 
 ; slide down
 mp_fx_2:
-	jsr mp_fx_preslide
+	mp_fx_preslide()
 	add [mpc_last_order+j], y
 	jsr modplayer_apply_order
 	set.l pc, pop
@@ -566,7 +597,7 @@ mp_fx_9:
 
 ; volume slide
 mp_fx_a:
-	jsr mp_fx_preslide
+	mp_fx_preslide()
 	
 	; if only lower nibble set, slide down, otherwise up
 	ifg 0xf, y
@@ -785,26 +816,7 @@ modplayer_tick:
 	set.l pc, mpt_return
 
 	mpt_next_ptn:
-		; reset pos to 0
-		set.l [mp_pat_pos+a], 0
-
-		set.l b, [mp_num_pats+a]
-		sub b, 1
-
-		; if we're at the last pattern, loop to loop point
-		ife b, [mp_curr_pat+a]
-			set.l pc, mpt_loop_song
-
-		add [mp_curr_pat+a], 1
-
-		jsr modplayer_calc_patpos_ptr
-
-		set.l pc, mpt_return
-
-	mpt_loop_song:
-		set.l [mp_curr_pat+a], [mp_restart_at+a]
-		jsr modplayer_calc_patpos_ptr
-		set.l pc, mpt_return
+	mp_next_ptn(a, y, x, j)
 	
 	mpt_dec_timer:
 		ifn [mp_delay+a], 0

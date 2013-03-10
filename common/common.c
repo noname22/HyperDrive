@@ -99,6 +99,54 @@ char* StrStrip(char* target, const char* str)
 	return target;
 }
 
+char* StrSubStr(char* target, const char* str, int from, int len)
+{
+	target[0] = 0;
+	int i;
+
+	from = HMAX(from, 0);
+	len = HCLAMP(len, 0, (int)strlen(str) - from);
+
+	if(from > strlen(str))
+		return target;
+
+	for(i = 0; i < len; i++)
+		target[i] = str[i + from];
+
+	target[i] = 0;
+	return target;
+}
+
+char* StrReplaceRange(char* target, const char *str, int from, int len, const char* with)
+{
+	target[0] = 0;
+	char* w = target;
+	const char* r = str, *r2 = with;
+
+	from = HMAX(from, 0);
+	len = HCLAMP(len, 0, (int)strlen(str) - from);
+	
+	if(len == 0){
+		strcpy(target, str);
+		return target;
+	}
+
+	for(int i = 0; i < from; i++)
+		*(w++) = *(r++);
+
+	while(*r2 != 0)
+		*(w++) = *(r2++);
+
+	for(int i = 0; i < len; i++)
+		r++;
+
+	while(*r != 0)
+		*(w++) = *(r++);
+
+	*w = 0;
+	return target;
+}
+
 char* StrReplace(char* target, const char* str, const char* what, const char* with)
 {
 	const char* ss = strstr(str, what);
@@ -115,3 +163,11 @@ char* StrReplace(char* target, const char* str, const char* what, const char* wi
 	return target;
 }
 
+int StrIndexOfChr(const char* s, int c)
+{
+	char* ptr = 0;
+	if((ptr = strchr(s, c)) != NULL)
+		return (intptr_t)ptr - (intptr_t)s;
+
+	return -1;
+}

@@ -20,8 +20,8 @@ start:
 	set.l [APU0_POS], 0
 
 	set.l [APU0_FLAGS], APU_FLAG_16B
-	bor   [APU0_FLAGS], APU_FLAG_LOOP
-	bor   [APU0_FLAGS], APU_FLAG_LOOP_PP
+	;bor   [APU0_FLAGS], APU_FLAG_LOOP
+	;bor   [APU0_FLAGS], APU_FLAG_LOOP_PP
 
 	set.l [APU0_FREQ], 48000
 	set.b [APU0_VOL], 255

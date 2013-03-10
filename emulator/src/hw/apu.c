@@ -103,8 +103,12 @@ void Apu_HandleChannel(Apu* me, int chnNum, int16_t* stream, int nSamples)
 		if(n16b)  smp = (int16_t)MEM_READ16(me->mem, (smpPtr + ((uint32_t)pos * 2)));
 		else      smp = (float)((int8_t)MEM_READ8(me->mem, (smpPtr + (uint32_t)pos)) * 256.0f);
 
-		stream[i * 2] += smp * chn->logVol * pan * .5;
-		stream[i * 2 + 1] += smp * chn->logVol * (1.0 - pan) * .5;
+		stream[i * 2] += smp * chn->logVol * pan * .25;
+		stream[i * 2 + 1] += smp * chn->logVol * (1.0 - pan) * .25;
+
+		//static float ttt;
+		//ttt += .1;
+		//stream[i * 2] = sin(ttt) * 8192;
 
 		pos += t;
 	}

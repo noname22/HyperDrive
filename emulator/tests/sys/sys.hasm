@@ -92,6 +92,8 @@ entry:
 
 .const USER_RAM       0x2000100
 
+.define set set.l 
+
 ; push all normal registers to stack
 push_all:
 	set.l [STD_TMP], pop

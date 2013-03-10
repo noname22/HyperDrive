@@ -28,6 +28,8 @@ typedef struct {
 	Defines* defines;
 	MacroVec macros;
 
+	int uniq, uniqCounter;
+
 	FILE* debugFile;
 } Hasm;
 
