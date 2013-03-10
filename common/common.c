@@ -57,7 +57,7 @@ int ReadFileAlloc(uint8_t** data, const char* filename)
 	return (int)fSize;
 }
 
-void DumpRam(uint8_t* ram, uint16_t end)
+void DumpRam(uint8_t* ram, uint32_t end)
 {
 	for(int i = 0; i < end + 1; i++){
 		if(i % 8 == 0) printf("\n%02x: ", i);

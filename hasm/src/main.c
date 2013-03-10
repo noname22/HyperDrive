@@ -27,11 +27,13 @@ int main(int argc, char** argv)
 				LogI("  -sX   set assembly start address [0-FFFF] - default 0");
 				LogI("  -h    show this help message");
 				LogI("  -d    generate debug symbols");
+				LogI("  -t    unit tests");
 				return 0;
 			}
 			else if(sscanf(v, "-v%d", &logLevel) == 1){}
 			else if(sscanf(v, "-s%x", &addr) == 1){}
 			else if(!strcmp(v, "-d")){ debugSymbols = true; }
+			else if(!strcmp(v, "-t")){ return Tests(argc, argv); }
 			else{
 				LogF("No such flag: %s", v);
 				return 1;
@@ -63,10 +65,12 @@ int main(int argc, char** argv)
 
 	Hasm_Destroy(&d);
 
-	if(logLevel == 0) DumpRam(ram, len - 1);
+	if(logLevel == 0 && len) DumpRam(ram, len - 1);
 
 	LogV("Writing to: %s", files[1]);
-	WriteFile(ram, len - 1, files[1]);
+	WriteFile(ram, len ? len - 1 : 0, files[1]);
+
+	LAssertWarn(len, "produced empty file");
 
 	free(ram);
 	return 0;

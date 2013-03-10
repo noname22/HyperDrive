@@ -37,7 +37,11 @@ uint32_t Hasm_Assemble(Hasm* me, const char* ifilename, uint8_t* ram, int startA
 	me->baseDir = calloc(1, GetDir(ifilename, NULL));
 	GetDir(ifilename, me->baseDir);
 
-	uint32_t ret = Assemble(me, ifilename, startAddr, 0);
+	Reader* r = Reader_CreateFromFile(ifilename);
+	LAssert(r, "could not open file: %s", ifilename);
+	uint32_t ret = Assemble(me, r, startAddr, 0);
+	Reader_Destroy(&r);
+
 	Labels_Replace(me->labels, me->ram);
 
 	return ret;

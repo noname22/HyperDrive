@@ -9,21 +9,29 @@
 #define MAX_STR_SIZE 8192
 #define LAssertError(__v, ...) \
 	if(!(__v)){ \
-		if(me->currentFile) LogI("@ %s:%d", me->currentFile, me->lineNumber); \
+		if(me->reader) LogI("@ %s:%d", Reader_GetFilename(me->reader), Reader_GetLineNumber(me->reader)); \
 		LogF(__VA_ARGS__); \
 		exit(1);\
 	}
 
 typedef Vector(char) CharVec;
 
-typedef struct 
+typedef char* CharPtr;
+typedef Vector(CharPtr) StrVec;
+
+struct Macro
 {
+	char* name;
+	char* filename;
 	int sourceLine; // Originating line
 	CharVec str;	// The macro
-} Macro;
+	StrVec args;
+};
 
-typedef Macro* MacroPtr;
-typedef Vector(MacroPtr) MacroVec;
+Macro* Macro_Create(const char* name, const char* filename, int sourceLine);
+void Macro_AddArg(Macro* me, const char* arg);
+bool Macro_AddLine(Macro* me, Hasm* hasm, const char* line);
+Reader* Macro_GetReader(Macro* me);
 
 typedef struct { char* searchReplace[2]; } Define;
 Vector(Define);
@@ -46,8 +54,8 @@ typedef struct {
 	uint32_t id;
 	bool found;
 
+	const char* filename;
 	int lineNumber;
-	char* filename;
 
 	LabelRefs references;
 } Label;
@@ -60,8 +68,16 @@ Label* Labels_Add(Labels* me, const char* label);
 void Labels_Define(Labels* me, Hasm* d, const char* label, uint32_t address, const char* filename, int lineNumber);
 uint32_t Labels_Get(Labels* me, const char* label, uint32_t current, uint32_t insAddr, const char* filename, int lineNumber);
 void Labels_Replace(Labels* me, uint8_t* ram);
+
+Reader* Reader_CreateFromFile(const char* filename);
+Reader* Reader_CreateFromBuffer(char* buffer, int len, const char* name, int startLineNum);
+int Reader_GetLineNumber(Reader* me);
+bool Reader_GetLine(Reader* me, char* buffer);
+const char* Reader_GetFilename(Reader* me);
+void Reader_Destroy(Reader** me);
+
 bool GetLine(Hasm* me, FILE* f, char* buffer);
 char* GetToken(Hasm* me, char* buffer, char* token);
-uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth);
+uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth);
 
 #endif

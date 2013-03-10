@@ -10,17 +10,21 @@
 extern int logLevel;
 
 typedef struct Label_vec_s Labels;
+typedef struct Macro Macro;
+typedef Macro* MacroPtr;
+typedef Vector(MacroPtr) MacroVec;
+typedef struct Reader Reader;
 
 typedef struct {
-	const char* currentFile;
 	char* baseDir;
-	int lineNumber;
 
 	uint8_t* ram;
 
 	uint32_t endAddr;
+	Reader* reader;
 
 	Labels* labels;
+	MacroVec macros;
 
 	FILE* debugFile;
 } Hasm;
@@ -28,5 +32,6 @@ typedef struct {
 Hasm* Hasm_Create();
 void Hasm_Destroy(Hasm** hasm);
 uint32_t Hasm_Assemble(Hasm* me, const char* ifilename, uint8_t* ram, int startAddr, uint32_t endAddr);
+int Tests(int argc, char** argv);
 
 #endif

@@ -8,9 +8,9 @@ static const char* valNames[] = VALNAMES;
 #define AD2INS(_n) (-2 - (_n))
 #define INS2AD(_n) (-(_n) - 2)
 
-typedef enum                           { AD_Org, AD_Const, AD_Reserve, AD_Fill, AD_IncBin, AD_Include, AD_Macro, AD_End, AD_Db, AD_Dw,  AD_Dd } AsmDir;
-static const char* adNames[AD_NUM] =   { ".org", ".const", ".reserve", ".fill", ".incbin", ".include",  "macro", "end", ".db",  ".dw", ".dd"  };
-int                adNumArgs[AD_NUM] = {    1,       2,        1,         2,        1,          1,         -1,     0,     -1,    -1,     -1   };
+typedef enum                           { AD_Org, AD_Const, AD_Reserve, AD_Fill, AD_IncBin, AD_Include, AD_MBegin, AD_MEnd, AD_Db, AD_Dw,  AD_Dd } AsmDir;
+static const char* adNames[AD_NUM] =   { ".org", ".const", ".reserve", ".fill", ".incbin", ".include", ".mbegin",  ".mend", ".db",  ".dw", ".dd"  };
+int                adNumArgs[AD_NUM] = {    1,       2,        1,         2,        1,          1,         -1,         0,     -1,    -1,     -1   };
 
 bool StrEmpty(const char* str)
 {
@@ -55,7 +55,7 @@ void WriteDebugInfo(Hasm* me, uint16_t addr, int wrote, int labelsAdded)
 	if(me->debugFile){
 		LogD("labels found: %d", labelsAdded);
 		// Write [address] [length of output (instruction, etc)] [line number] [file]
-		fprintf(me->debugFile, "%04x %04x %d %s", addr - wrote, wrote, me->lineNumber, me->currentFile);
+		fprintf(me->debugFile, "%04x %04x %d %s", addr - wrote, wrote, Reader_GetLineNumber(me->reader), Reader_GetFilename(me->reader));
 
 		// Write all labels associated with this address			
 		for(int i = 0; i < labelsAdded; i++) 
@@ -175,25 +175,32 @@ char* UnquoteStr(Hasm* me, char* target, const char* str)
 	return strncat(target, str + 1, strlen(str) - 2);
 }
 
-uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
+Macro* GetMacro(Hasm* me, const char* name)
 {
-	LogV("Assembling: %s", ifilename);
+	MacroPtr* it;
+	Vector_ForEach(me->macros, it){
+		if(!strcmp(name, (*it)->name)){
+			return *it;
+		}
+	}
+	return NULL;
+}
+
+uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
+{
+	LogV("Assembling: %s", Reader_GetFilename(reader));
 	LogD("at address: 0x%x", addr);
 
-	FILE* in = fopen(ifilename, "r");
-	LAssertError(in, "could not open file: %s", ifilename);
-
-	const char* saveFile = me->currentFile;
-	int saveLineNumber = me->lineNumber;
-
-	me->currentFile = ifilename;
-	me->lineNumber = 0;
+	Reader* saveReader = me->reader;
+	me->reader = reader;
 
 	char buffer[MAX_STR_SIZE];
 	char token[MAX_STR_SIZE];
 
 	bool done = false;
 	int labelsAdded = 0;
+
+	Macro* currentMacro = NULL;
 
 	do{
 		int wrote = 0;
@@ -222,7 +229,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 
 		char* line = buffer;
 
-		done = GetLine(me, in, line);
+		done = Reader_GetLine(me->reader, line);
 
 		int insnum = -1;
 
@@ -231,9 +238,20 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 		uint32_t nextWord[2] = {0, 0};
 		char* opLabels[2] = {NULL, NULL};
 		char* constName;
+		Macro* parsingMacroCallTo = NULL;
 
 		uint32_t tmp = 0;
 		
+		// Currently defining a macro, let it eat the line
+		if(currentMacro){
+			if(Macro_AddLine(currentMacro, me, line)){
+				Vector_Add(me->macros, currentMacro);
+				currentMacro = NULL;
+				LogD("done parsing macro");
+			}
+			continue;
+		}
+
 		if(StrEmpty(line)) continue;
 
 		int toknum = 0;
@@ -244,12 +262,12 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			
 			if(StrEmpty(token)) break;
 
-			//LogD("token: '%s'", token);
+			LogD("token (%d): '%s'", toknum, token);
 
 			// A label, add it and continue	
 			if(toknum == 0 && ENDSWITH(token, ':')) {
 				token[strlen(token) - 1] = 0;
-				Labels_Define(me->labels, me, token, addr, me->currentFile, me->lineNumber);
+				Labels_Define(me->labels, me, token, addr, Reader_GetFilename(me->reader), Reader_GetLineNumber(me->reader));
 				labelsAdded++;
 				continue;
 			}
@@ -258,7 +276,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			if(toknum > 0 && insnum < -1){
 				AsmDir ad = INS2AD(insnum);
 
-				LAssertError(adNumArgs[ad] == -1 || 
+				LAssertError(adNumArgs[ad] == -1 ||
 					(toknum <= adNumArgs[ad] && toknum + 1 >= adNumArgs[ad]),
 					"%s expects %d arguments", adNames[ad], adNumArgs[ad]);
 
@@ -288,21 +306,21 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 							WriteN(lit);
 						}else{
 							// A label
-							LAssertError(ad == AD_Dd, "labels can only be written in a double word data block (.dd)");
-							Labels_Get(me->labels, token, addr, addr - wrote, me->currentFile, me->lineNumber);
+							LAssertError(ad == AD_Dd, "labels can only be written in a double word data block (.dd) %d", ad);
+							Labels_Get(me->labels, token, addr, addr - wrote, Reader_GetFilename(me->reader), Reader_GetLineNumber(me->reader));
 							// Write a placeholder address
 							Write32(0);
 						}
 					}
 				}
 
-				// .ORG
+				// .org
 				else if(ad == AD_Org){
 					addr = ParseLiteral(me, token, NULL, true);
 					LAssertError(addr <= me->endAddr, "ORG outside ROM size (0x%x > 0x%x)", addr, me->endAddr + 1);
 				}
 		
-				// .DEFINE
+				// .const
 				else if(ad == AD_Const){	
 					//def.searchReplace[toknum - 1] = strdup(token);
 					//if(toknum == 2) Vector_Add(*me->defines, def); 
@@ -310,12 +328,12 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 						constName = strdup(token);
 
 					if(toknum == 2){
-						Labels_Define(me->labels, me, constName, ParseLiteral(me, token, NULL, true), me->currentFile, me->lineNumber);
+						Labels_Define(me->labels, me, constName, ParseLiteral(me, token, NULL, true), Reader_GetFilename(me->reader), Reader_GetLineNumber(me->reader));
 						free(constName);
 					}
 				}	
 
-				// .FILL
+				// .fill
 				// XXX: FILLB FILLW FILLD?
 				else if(ad == AD_Fill){
 					if(toknum == 1) tmp = ParseLiteral(me, token, NULL, true);
@@ -325,10 +343,10 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 					}
 				}
 
-				// .RESERVE
+				// .reserve
 				else if(ad == AD_Reserve) addr += ParseLiteral(me, token, NULL, true);
 
-				// .INCBIN
+				// .incbin
 				else if(ad == AD_IncBin){
 					char ibFile[MAX_STR_SIZE];
 					UnquoteStr(me, ibFile, token);
@@ -341,16 +359,47 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 					addr += fSize;
 				}
 
-				// .INCLUDE
+				// .include
 				else if(ad == AD_Include){
 					char ibFile[MAX_STR_SIZE];
 					char buffer[MAX_STR_SIZE];
 					sprintf(buffer, "%s%s", me->baseDir, UnquoteStr(me, ibFile, token));
-					addr = Assemble(me, buffer, addr, depth + 1);
+
+					Reader* r = Reader_CreateFromFile(buffer);
+					LAssertError(r, "could not open file: %s", buffer);
+					addr = Assemble(me, r, addr, depth + 1);
+					Reader_Destroy(&r);
 				}
+
+				// .macro
+				else if(ad == AD_MBegin){
+					LogD("begin macro");
+					if(toknum == 1){
+						currentMacro = Macro_Create(token, Reader_GetFilename(me->reader), Reader_GetLineNumber(me->reader));
+					}
+
+					else{
+						if(toknum == 2){
+							LAssert(!strcmp(token, "("), "expected '(' after macro definition: %s", currentMacro->name);
+						}
+
+						else if(!strcmp(token, ")")){
+							// should probably actually stop here
+							LogD("end of macro definition");
+						}
+
+						else {
+							LogD("Adding macro argument: %s", token);
+							Macro_AddArg(currentMacro, token);
+						}
+					}
+
+				}
+
+				LAssertError(ad != AD_MEnd, ".mend without .mstart");
 			}
 
-			// An instruction or assembly directive
+			// An instruction, assembly directive or macro call
 			else if(toknum == 0){
 				insnum = -1;
 
@@ -370,19 +419,52 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 						goto done_searching;
 					}
 				}
+			
+				// Macro calls
+				parsingMacroCallTo = GetMacro(me, token);
+				if(parsingMacroCallTo){
+					LogD("parsing a macro call");
+					goto done_searching;
+				}
 
-				LAssertError(insnum != -1, "no such instruction or directive: %s", token);
+				LAssertError(insnum != -1, "no such instruction, directive or macro: %s", token);
 
 				done_searching: 
 				while(0){} // "NOOP", must have something after a label
 			}
 
+			// handle arguments to macro calls
+			else if(toknum > 0 && parsingMacroCallTo){
+				LogD("macro arg: %s", token);
+				if(toknum == 1){
+					LAssert(!strcmp(token, "("), "expected '(' after macro call: %s", parsingMacroCallTo->name);
+				}
+
+				else if(!strcmp(token, ")")){
+					Reader* r = Macro_GetReader(parsingMacroCallTo);
+					addr = Assemble(me, r, addr, depth + 1);
+					Reader_Destroy(&r);
+					parsingMacroCallTo = NULL;
+				}
+			}
 			else if( toknum == 1 || toknum == 2 ){
 				operands[toknum - 1] = ParseOperand(me, token, nextWord + toknum - 1, opLabels + toknum - 1);
 				numOperands++;
 			}
+
+			else {
+				LAssertWarn(false, "garbage at end of line: %s", token);
+			}
 				
 			toknum++;
+		}
+
+		
+		// Make sure all assembler directives got their requested number of args
+		if(insnum < -1){
+			AsmDir ad = INS2AD(insnum);
+			LAssertError(toknum - 1 == adNumArgs[ad] || adNumArgs[ad] == -1, 
+				"%s expects %d arguments (not %d)", adNames[ad], adNumArgs[ad], toknum - 1);
 		}
 
 		// Assembler directive handled (-2) or no instruction found 
@@ -415,7 +497,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 			if(OpHasNextWord(operands[i])){
 				// This refers to a label
 				if(opLabels[i]){
-					Labels_Get(me->labels, opLabels[i], addr, addr - wrote, me->currentFile, me->lineNumber);
+					Labels_Get(me->labels, opLabels[i], addr, addr - wrote, Reader_GetFilename(me->reader), Reader_GetLineNumber(me->reader));
 					free(opLabels[i]);
 				}
 
@@ -439,10 +521,7 @@ uint32_t Assemble(Hasm* me, const char* ifilename, int addr, int depth)
 
 	} while (done);
 
-	fclose(in);
-	
-	me->currentFile = saveFile;
-	me->lineNumber = saveLineNumber;
+	me->reader = saveReader;
 
 	return addr;
 }

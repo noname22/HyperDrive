@@ -16,7 +16,7 @@ extern int logLevel;
 typedef enum {DBO_LittleEndian, DBO_BigEndian } DByteOrder;
 
 uint32_t GetUsedRam(uint8_t* rom);
-void DumpRam(uint8_t* ram, uint16_t end);
+void DumpRam(uint8_t* ram, uint32_t end);
 
 bool WriteFile(uint8_t* data, uint32_t size, const char* filename);
 int ReadFile(uint8_t* data, uint32_t size, const char* filename);

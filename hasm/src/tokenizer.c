@@ -1,21 +1,21 @@
 #include "hasmi.h"
 
-bool GetLine(Hasm* me, FILE* f, char* buffer)
+/*static bool StrContainsOneOf(const char* haystack, const char* needles)
 {
-	me->lineNumber++;
-	int at = 0;
+	for(int i = 0; i < strlen(needles); i++)
+		if(strchr(haystack, needles[i]))
+			return true;
 
-	for(;;) {
-		int c = fgetc(f);
-		if(c == '\r' || c == '\n' || c == EOF || c == ';'){
-			bool ret = c != EOF;
-			while(c != '\n' && c != EOF){ c = fgetc(f); }
-			buffer[at] = '\0';
-			return ret;
-		}
+	return false;
+}*/
 
-		buffer[at++] = c;
-	}
+static int IndexOfChr(const char* s, int c)
+{
+	char* ptr = 0;
+	if((ptr = strchr(s, c)) != NULL)
+		return (intptr_t)ptr - (intptr_t)s;
+
+	return -1;
 }
 
 char* GetToken(Hasm* me, char* line, char* token)
@@ -25,12 +25,26 @@ char* GetToken(Hasm* me, char* line, char* token)
 
 	// read into token until the next space or end of string
 	int at = 0;
+	int idx = 0;
 	
 	char expecting = 0;
 
 	char start[] = "\"'[";
 	char end[] = "\"']";
+	char stop[] = "()";
 
+	// already at the end of the line
+	if(*line == 0){
+		*token = 0;
+		return line;
+	}
+
+	// stop if the first character is a stop char
+	if(strchr(stop, *line)){
+		*token = *line;
+		token[1] = 0;
+		return line + 1;
+	}
 
 	while((expecting || (*line > 32 && *line != ',')) && *line != 0){
 		if(*line == '\\'){
@@ -40,8 +54,10 @@ char* GetToken(Hasm* me, char* line, char* token)
 			if(expecting){
 				if(*line == expecting) expecting = 0;
 			}else{
-				for(int i = 0; i < sizeof(start); i++){
-					if(*line == start[i]) expecting = end[i];
+				if((idx = IndexOfChr(start, *line)) != -1)
+					expecting = end[idx];
+				else if(strchr(stop, *line)){
+					break;
 				}
 			}
 		}
@@ -63,5 +79,3 @@ char* GetToken(Hasm* me, char* line, char* token)
 
 	return line;
 }
-
-

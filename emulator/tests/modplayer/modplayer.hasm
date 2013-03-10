@@ -50,9 +50,14 @@
 .const mpc_effect_param   0x08
 .const mpc_order          0x0C
 .const mpc_hw_chn         0x10
+.const mpc_last_param     0x14
+.const mpc_last_order     0x18
 
 ; constants
 .const mp_magic_pal 7093789 ; "magic number" for PAL timing, period/freqency divisor
+
+; effect jump table
+mp_effect_jmp: .dd mp_fx_0 mp_fx_1 mp_fx_2 mp_fx_3 mp_fx_4 mp_fx_5 mp_fx_6 mp_fx_7 mp_fx_8 mp_fx_9 mp_fx_a mp_fx_b mp_fx_c mp_fx_d mp_fx_e mp_fx_f
 
 mp_dmsg: .db "dec: %d", 10, 0
 mp_xmsg: .db "hex: 0x%x", 10, 0
@@ -97,10 +102,12 @@ modplayer_parse_sample:
 	add j, 1
 
 	; 1 byte sample volume
-	set.l [mps_vol+a], [j]
-	mul [mps_vol+a], 4 ; 0-64 -> 0-255
-	ifg  [mps_vol+a], 255
-		set.l [mps_vol+a], 255
+	set.b x, [j]
+	mul b, 4 ; 0-64 -> 0-255
+	ifg  b, 255
+		set.l b, 255
+
+	set.b [mps_vol+a], b
 	add j, 1
 
 	; 2 byte loop start
@@ -366,6 +373,24 @@ modplayer_print_note:
 
 	set.l pc, pop
 
+; converts amiga order to freqency and sets it to a hardware channel
+;   j -> channel
+;   b -> hardware channel
+;   modifies y, c
+
+modplayer_apply_order:
+	; set playback frequency
+	;   7093789.2 / (period * 2)
+
+	set.l c, [mpc_last_order+j]
+
+	mul c, 2
+	set.l y, mp_magic_pal
+	div y, c
+
+	set.l [APU_O_FREQ+b], y
+	
+
 ; trigger a note
 ;   a -> mod player object pointer
 ;   i -> channel number
@@ -474,6 +499,157 @@ modplayer_calc_patpos_ptr:
 
 	set.l pc, pop
 
+; all effects
+;   a -> mod player object
+;   b -> hw channel
+;   j -> channel pointer
+;   i -> channel number
+;   can modify y, c 
+
+mp_fx_preslide:
+	; not on a new note (most accurate, at least compared to fast tracker)
+	ife [mp_delay+a], 0
+		set.l pc, pop
+
+	set.l y, [mpc_effect_param+j]
+
+	; use previous param setting if it's 0
+	ife y, 0
+		set.l y, [mpc_last_param+j]
+	set.l pc, pop
+
+; arpreggio
+mp_fx_0:
+	set.l pc, pop
+
+; slide up
+mp_fx_1:
+	jsr mp_fx_preslide
+	sub [mpc_last_order+j], y
+	jsr modplayer_apply_order
+	set.l pc, pop
+
+; slide down
+mp_fx_2:
+	jsr mp_fx_preslide
+	add [mpc_last_order+j], y
+	jsr modplayer_apply_order
+	set.l pc, pop
+
+; slide to note
+mp_fx_3:
+	set.l pc, pop
+
+; vibrato
+mp_fx_4:
+	set.l pc, pop
+
+; continue Slide to note, but also do volume slide
+mp_fx_5:
+	set.l pc, pop
+
+; continue vibrato but also do volume slide
+mp_fx_6:
+	set.l pc, pop
+
+; tremlo
+mp_fx_7:
+	set.l pc, pop
+
+; set pan
+mp_fx_8:
+	set.l pc, pop
+
+; set sample offset
+mp_fx_9:
+	set.l pc, pop
+
+; volume slide
+mp_fx_a:
+	jsr mp_fx_preslide
+	
+	; if only lower nibble set, slide down, otherwise up
+	ifg 0xf, y
+		set.l pc, mp_fx_a_down
+
+	; slide up
+
+	and y, 0xf0
+
+	shr y, 4
+	mul y, 4
+
+	set.b c, [APU_O_VOL+b]
+
+	add c, y
+
+	; make sure it's below 255
+	ifg c, 255
+		set.l c, 255
+
+	set.l [APU_O_VOL+b], c
+
+	set.l pc, pop
+	mp_fx_a_down:
+
+	mul y, 4
+	set.b c, [APU_O_VOL+b]
+	sub c, y
+	
+	; make sure volume is 0 or above (unsigned compare, overflow -> very big number)
+	ifg c, 255
+		set.l c, 0
+	
+	set.b [APU_O_VOL+b], c
+
+	set.l pc, pop
+	
+	;set.l push, c
+	;set.l push, mp_xmsg
+	;sys SYS_PRINT
+
+
+; position jump
+mp_fx_b:
+	set.l pc, pop
+
+; set volume
+mp_fx_c:
+	; only on a new note
+	ifn [mp_delay+a], 0
+		set.l pc, pop
+
+	set.l y, [mpc_effect_param+j]
+	mul y, 4 ; 0-64 -> 0-255
+	ifg y , 255
+		set.l y, 255
+	set.b [APU_O_VOL+b], y
+
+	set.l pc, pop
+
+; pattern break
+mp_fx_d:
+	set.l pc, pop
+
+; set filter
+mp_fx_e:
+	set.l pc, pop
+
+; set speed
+mp_fx_f:
+	; only on a new note
+	ifn [mp_delay+a], 0
+		set.l pc, pop
+
+	; don't handle bmp changes yet
+	ifg [mpc_effect_param+j], 32
+		set.l pc, pop
+
+	; set speed
+	set.l [mp_spd+a], [mpc_effect_param+j]
+
+	set.l pc, pop
+
 ; update the player
 ;   a -> mod player object pointer
 
@@ -491,7 +667,7 @@ modplayer_tick:
 
 	; Loop through the channels
 	set.l i, 0
-
+		
 	mp_channel_loop:
 		; parse the note if delay is 0
 		ifn [mp_delay+a], 0
@@ -518,6 +694,10 @@ modplayer_tick:
 
 			set.l [mpc_order+j], c
 
+			; if there's a new note, replace the current playing one
+			ifn c, 0
+				set.l [mpc_last_order+j], c
+
 			add x, 1
 
 			; 1 bytes instrument / effect
@@ -540,7 +720,15 @@ modplayer_tick:
 			add x, 1
 
 			; read effect parameter
-			set.b [mpc_effect_param+j], [x]
+			set.b b, [x]
+
+			set.b [mpc_effect_param+j], b
+
+			; used by slides, where they use the last param setting if
+			; 0 is given. Set this only if param is not 0
+			ifn b, 0
+				set.b [mpc_last_param+j], b
+
 			add x, 1
 
 			set.l push, x
@@ -554,6 +742,10 @@ modplayer_tick:
 			set.l x, pop
 
 		mp_apply_effects:
+			set.l y, [mpc_effect+j] ; put effect number in y
+			mul y, 4
+			set.l b, [mpc_hw_chn+j] ; put hardware channel in b
+			jsr [mp_effect_jmp+y]   ; call the effect function
 
 		; step to the next channel data object
 		add j, mpc_sizeof
@@ -561,6 +753,8 @@ modplayer_tick:
 		add i, 1
 		ifn i, [mp_num_chn+a]
 			set.l pc, mp_channel_loop
+
+	mp_skip_play:
 
 	; if the delay is not 0, just decrease the timer
 	ifn [mp_delay+a], 0
@@ -576,6 +770,7 @@ modplayer_tick:
 
 	; reset note delay timer to speed
 	set.l [mp_delay+a], [mp_spd+a]
+	sub [mp_delay+a], 1
 
 	; point current position pointer to next position
 	add [mp_curr_pos_ptr+a], [mp_track_size+a]
