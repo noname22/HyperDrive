@@ -201,7 +201,7 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 	int saveUniq = me->uniq;
 	me->uniq = me->uniqCounter++;
 
-	sprintf(buffer, "%d_", me->uniq);
+	sprintf(buffer, "uniq_%d_", me->uniq);
 	Defines_Set(me->defines, "uniq", buffer);
 
 	bool done = false;
@@ -566,7 +566,7 @@ uint32_t Assemble(Hasm* me, Reader* reader, int addr, int depth)
 	me->reader = saveReader;
 	
 	me->uniq = saveUniq;
-	sprintf(buffer, "%d_", me->uniq);
+	sprintf(buffer, "uniq_%d_", me->uniq);
 	Defines_Set(me->defines, "uniq", buffer);
 
 	return addr;

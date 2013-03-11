@@ -18,6 +18,7 @@
 .const mp_curr_pos_ptr 0x38
 
 .const mp_track_size   0x3c
+.const mp_jump_next    0x40
 
 ; playing note
 ;.const mp_curr_pat    0x38
@@ -69,6 +70,17 @@ mp_newline: .db 10, 0
 	sys SYS_PRINT
 .end
 
+.macro Print0(str)
+	Push(str)
+	sys SYS_PRINT
+.end
+
+.macro Print1(str, a1)
+	Push(a1)
+	Push(str)
+	sys SYS_PRINT
+.end
+
 ; parse a sapmle
 ;   a -> pointer to sample structure to write to
 ;   j -> file pointer 
@@ -116,9 +128,9 @@ mps_parsed_msg:
 	set.l [mp_curr_pos_ptr+obj], w3
 .end
 
-.macro mp_next_ptn(mp, w0, w1, w2)
+.macro mp_next_ptn(mp, pos, w0, w1, w2)
 	; reset pos to 0
-	set.l [mp_pat_pos+mp], 0
+	set.l [mp_pat_pos+mp], pos
 
 	set.l w0, [mp_num_pats+mp]
 	sub w0, 1
@@ -375,6 +387,8 @@ modplayer_init:
 
 	set.l a, x
 	modplayer_calc_patpos_ptr(a, y, x, j)
+
+	set [mp_jump_next+a], -1
 
 	set.l pc, pop
 
@@ -660,6 +674,25 @@ mp_fx_c:
 
 ; pattern break
 mp_fx_d:
+	; Hex encoded decimal parameter 
+	; 0x40 should be interprted as 40
+
+	set c, [mpc_effect_param+j] 
+	and c, 0xf
+
+	set y, [mpc_effect_param+j]
+	shr y, 4
+	and y, 0xf
+	mul y, 10
+	add y, c
+
+	ifg y, 63
+		set y, 63 
+
+	; since this shouldn't happen until the next division
+	; save the value in jump next and the main loop will take care of it
+	set [mp_jump_next+a], y
+
 	set.l pc, pop
 
 ; set filter
@@ -698,6 +731,14 @@ modplayer_tick:
 
 	; Loop through the channels
 	set.l i, 0
+
+	; if mp_jump_next != -1 
+	; a pattern break effect from last division wants to jump to next pattern
+	ife [mp_jump_next+a], -1
+		set pc, mp_channel_loop
+
+	ife [mp_delay+a], 0
+		set pc, mpt_next_ptn
 		
 	mp_channel_loop:
 		; parse the note if delay is 0
@@ -816,7 +857,15 @@ modplayer_tick:
 	set.l pc, mpt_return
 
 	mpt_next_ptn:
-	mp_next_ptn(a, y, x, j)
+	set b, [mp_jump_next+a]
+	ife b, -1:
+		set b, 0
+
+	mp_next_ptn(a, b, y, x, j)
+
+	set [mp_jump_next+a], -1
+
+	Print0(mp_newline)
 	
 	mpt_dec_timer:
 		ifn [mp_delay+a], 0

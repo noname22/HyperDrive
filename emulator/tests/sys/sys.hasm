@@ -82,7 +82,7 @@ entry:
 .const APU_O_LEND     0x10
 .const APU_O_FREQ     0x14
 .const APU_O_VOL      0x18
-.const APU_O_PAN      0x19
+.const APU_O_PAN      0x1C
 
 .const APU_FLAG_16B     1
 .const APU_FLAG_LOOP    2
@@ -93,6 +93,18 @@ entry:
 .const USER_RAM       0x2000100
 
 .define set set.l 
+
+.macro Push(what)
+	set push, what
+.end
+
+.macro Pop(what)
+	set what, pop
+.end
+
+.macro Return()
+	Pop(pc)
+.end
 
 ; push all normal registers to stack
 push_all:

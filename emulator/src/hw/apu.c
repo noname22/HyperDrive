@@ -69,7 +69,7 @@ void Apu_HandleChannel(Apu* me, int chnNum, int16_t* stream, int nSamples)
 	float tt = (float)freq / (float)APU_RATE;
 	float t = chn->ppBackwards ? -tt : tt;
 
-	uint8_t vol = MEM_READ8(me->mem, addr); addr += 1;
+	uint8_t vol = MEM_READ32(me->mem, addr); addr += 4;
 	if(vol != chn->vol){
 		chn->vol = vol;
 		chn->logVol = log10f((float)vol / 255.0f * 9 + 1);
@@ -77,7 +77,7 @@ void Apu_HandleChannel(Apu* me, int chnNum, int16_t* stream, int nSamples)
 		LogD("vol %d", vol);
 	}
 
-	float pan = (float)(MEM_READ8(me->mem, addr)) / 255.0f; addr += 1;
+	float pan = (float)((uint8_t)(MEM_READ32(me->mem, addr))) / 255.0f; addr += 1;
 	//LogD("loop start: %d", loopStart);
 	//LogD("loop end: %d", loopEnd);
 

@@ -31,7 +31,7 @@ bool Macro_AddLine(Macro* me, Hasm* hasm, const char* line)
 	}
 	Vector_Add(me->str, '\n');;
 
-	LogD("macro now conatins:\n%s", me->str.elems);
+	LogD("macro now conatins:\n%.*s", me->str.count, me->str.elems);
 
 	return false;
 }
