@@ -24,5 +24,6 @@ start:
 		set.l pc, loop
 
 ;mod_file: .incbin "test.mod"
-mod_file: .incbin "fountain.mod"
+;mod_file: .incbin "fountain.mod"
 ;mod_file: .incbin "pinball_illusions.mod"
+mod_file: .incbin "radix-rainy_summerdays.mod"

@@ -52,7 +52,7 @@
 .const mpc_order          0x0C
 .const mpc_hw_chn         0x10
 .const mpc_last_param     0x14
-.const mpc_last_order     0x18
+.const mpc_playing_order  0x18
 
 ; constants
 .const mp_magic_pal 7093789 ; "magic number" for PAL timing, period/freqency divisor
@@ -63,6 +63,22 @@ mp_effect_jmp: .dd mp_fx_0 mp_fx_1 mp_fx_2 mp_fx_3 mp_fx_4 mp_fx_5 mp_fx_6 mp_fx
 mp_dmsg: .db "dec: %d", 10, 0
 mp_xmsg: .db "hex: 0x%x", 10, 0
 mp_newline: .db 10, 0
+
+mp_order_tab: .include "ordertab.hasm"
+;.dd 1712,1616,1525,1440,1357,1281,1209,1141,1077,1017, 961, 907
+;.dd 856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453
+;.dd 428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226
+;.dd 214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113
+;.dd 107, 101,  95,  90,  85,  80,  76,  71,  67,  64,  60,  56 ; 57?
+;.dd 53, 50, 47, 45, 42, 40, 37, 35, 33, 31, 30, 28 
+;.dd 27, 25, 24, 22, 21, 20, 19, 18, 17, 16, 15, 14, 0
+
+
+.macro PrintDec(what)
+	set push, what
+	set push, mp_dmsg
+	sys SYS_PRINT
+.end
 
 .macro PrintHex(what)
 	set push, what
@@ -80,10 +96,6 @@ mp_newline: .db 10, 0
 	Push(str)
 	sys SYS_PRINT
 .end
-
-; parse a sapmle
-;   a -> pointer to sample structure to write to
-;   j -> file pointer 
 
 mp_sname_msg:   .db "sample name: %s", 10, 0
 mp_ftune_tab:   .db 0, +1, +2, +3, +4, +5, +6, +7, -8, -7, -6, -5, -4, -3, -2, -1
@@ -152,6 +164,69 @@ mps_parsed_msg:
 	uniq#return:
 .end
 
+; calculates an index into an order tab, so order -> note number x 4
+.macro mp_lookup_order(order, out)
+	set out, 0
+
+	uniq#mpp_loop:
+		ifg order, [mp_order_tab+out]
+			set pc, uniq#mpp_break
+
+		add out, 4
+		ifn out, 240
+			set.l pc, uniq#mpp_loop
+
+	uniq#mpp_break:
+	ifn out, 240
+		sub out, 4
+.end
+
+; get a pointer to the sample/instrument structure
+.macro mp_lookup_sample(obj, smpnum, out)
+	set.l out, mps_sizeof     ; sizeof sample struct
+	mul out, smpnum           ; ... times instrument number
+	add out, mp_samples_idx1  ; ... plus offset of the samples into the mp structure (1 indexed, instruments begin at 1)
+	add out, obj               ; ... plus the object location -> x contains the sample location
+.end
+	
+; since samples can be finetuned the order needs to be converted
+; into an index into an order tab and then adjusted for fine tuning
+
+.macro mp_finetune_order(obj, chn, w0, w1, w2)
+	; only continue of order isn't 0
+	ife [mpc_order+chn], 0
+		set pc, uniq#break
+	
+	Push(w0)
+	Push(w1)
+	Push(w2)
+	
+	mp_lookup_sample(obj, [mpc_ins+chn], w1)
+	mp_lookup_order([mpc_order+chn], w0)
+
+	;lookup failed
+	ife w0, 240
+		set pc, uniq#break
+
+	; index to the correctly finetuned order tab
+	set w2, [mps_finetune+w1]
+	mul w2, 60
+
+	; index into the order tab with the order number
+	add w0, w2
+	
+	set [mpc_playing_order+chn], [mp_order_tab+w0]
+
+	Pop(w2)
+	Pop(w1)
+	Pop(w0)
+	
+	uniq#break:
+.end
+
+; parse a sapmle
+;   a -> pointer to sample structure to write to
+;   j -> file pointer 
 
 modplayer_parse_sample:
 	set.l push x
@@ -175,7 +250,7 @@ modplayer_parse_sample:
 
 	; 1 byte fine tune
 	set.b x, [j]
-	set.b [mps_finetune+a], [mp_ftune_tab+x]
+	set.b [mps_finetune+a], x ;[mp_ftune_tab+x]
 	add j, 1
 
 	; 1 byte sample volume
@@ -392,24 +467,16 @@ modplayer_init:
 
 	set.l pc, pop
 
-mp_order_tab:
-.dd 1712,1616,1525,1440,1357,1281,1209,1141,1077,1017, 961, 907
-.dd 856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453
-.dd 428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226
-.dd 214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113
-.dd 107, 101,  95,  90,  85,  80,  76,  71,  67,  64,  60,  56 ; 57?
-.dd 53, 50, 47, 45, 42, 40, 37, 35, 33, 31, 30, 28 
-.dd 27, 25, 24, 22, 21, 20, 19, 18, 17, 16, 15, 14, 0
-
-
 mp_note_tab:
 .db "C-0", 0, "C#0", 0, "D-0", 0, "D#0", 0, "E-0", 0, "F-0", 0, "F#0", 0, "G-0", 0, "G#0", 0, "A-0", 0, "A#0", 0, "B-0", 0
 .db "C-1", 0, "C#1", 0, "D-1", 0, "D#1", 0, "E-1", 0, "F-1", 0, "F#1", 0, "G-1", 0, "G#1", 0, "A-1", 0, "A#1", 0, "B-1", 0
 .db "C-2", 0, "C#2", 0, "D-2", 0, "D#2", 0, "E-2", 0, "F-2", 0, "F#2", 0, "G-2", 0, "G#2", 0, "A-2", 0, "A#2", 0, "B-2", 0
 .db "C-3", 0, "C#3", 0, "D-3", 0, "D#3", 0, "E-3", 0, "F-3", 0, "F#3", 0, "G-3", 0, "G#3", 0, "A-3", 0, "A#3", 0, "B-3", 0
-.db "C-4", 0, "C#4", 0, "D-4", 0, "D#4", 0, "E-4", 0, "F-4", 0, "F#4", 0, "G-4", 0, "G#4", 0, "A-4", 0, "A#4", 0, "B-4", 0
-.db "C-5", 0, "C#5", 0, "D-5", 0, "D#5", 0, "E-5", 0, "F-5", 0, "F#5", 0, "G-5", 0, "G#5", 0, "A-5", 0, "A#5", 0, "B-5", 0
-.db "C-6", 0, "C#6", 0, "D-6", 0, "D#6", 0, "E-6", 0, "F-6", 0, "F#6", 0, "G-6", 0, "G#6", 0, "A-6", 0, "A#6", 0, "B-6", 0, "---", 0
+.db "C-4", 0, "C#4", 0, "D-4", 0, "D#4", 0, "E-4", 0, "F-4", 0, "F#4", 0, "G-4", 0, "G#4", 0, "A-4", 0, "A#4", 0, "B-4", 0 
+.db "---", 0
+
+;.db "C-5", 0, "C#5", 0, "D-5", 0, "D#5", 0, "E-5", 0, "F-5", 0, "F#5", 0, "G-5", 0, "G#5", 0, "A-5", 0, "A#5", 0, "B-5", 0
+;.db "C-6", 0, "C#6", 0, "D-6", 0, "D#6", 0, "E-6", 0, "F-6", 0, "F#6", 0, "G-6", 0, "G#6", 0, "A-6", 0, "A#6", 0, "B-6", 0, "---", 0
 
 mp_effect_tab:
 .db "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZ"
@@ -421,20 +488,7 @@ mpp_note_msg: .db "(% 4d) %s %02x %c%02x | ", 0
 ;   j -> current channel playing data struct pointer
 
 modplayer_print_note:
-	set.l b, 0
-
-	mpp_loop:
-		ifg [mpc_order+j], [mp_order_tab+b]
-			set.l pc, mpp_break
-
-		add b, 4
-		ifn b, 336
-			set.l pc, mpp_loop
-
-	mpp_break:
-
-	ifn b, 336
-		sub b, 4
+	mp_lookup_order([mpc_order+j], b)
 
 	add b, mp_note_tab
 
@@ -453,21 +507,15 @@ modplayer_print_note:
 	set.l pc, pop
 
 ; converts amiga order to freqency and sets it to a hardware channel
-;   j -> channel
-;   b -> hardware channel
-;   modifies y, c
+.macro modplayer_apply_order(chn, hw, w0, w1)
+	set.l w0, [mpc_playing_order+chn]
 
-modplayer_apply_order:
-	; set playback frequency
-	;   7093789.2 / (period * 2)
+	mul w0, 2
+	set.l w1, mp_magic_pal
+	div w1, w0
 
-	set.l c, [mpc_last_order+j]
-
-	mul c, 2
-	set.l y, mp_magic_pal
-	div y, c
-
-	set.l [APU_O_FREQ+b], y
+	set.l [APU_O_FREQ+hw], w1
+.end
 	
 
 ; trigger a note
@@ -531,16 +579,7 @@ modplayer_trigger_note:
 	ife b, 0
 		set.b [APU_O_PAN+z], 89
 
-	; set playback frequency
-	;   7093789.2 / (period * 2)
-
-	set.l c, [mpc_order+j]
-
-	mul c, 2
-	set.l b, mp_magic_pal
-	div b, c
-
-	set.l [APU_O_FREQ+z], b
+	modplayer_apply_order(j, z, c, b)
 
 	set.l pc, pop
 
@@ -570,15 +609,15 @@ mp_fx_0:
 ; slide up
 mp_fx_1:
 	mp_fx_preslide()
-	sub [mpc_last_order+j], y
-	jsr modplayer_apply_order
+	sub [mpc_playing_order+j], y
+	modplayer_apply_order(j, b, y, c)
 	set.l pc, pop
 
 ; slide down
 mp_fx_2:
 	mp_fx_preslide()
-	add [mpc_last_order+j], y
-	jsr modplayer_apply_order
+	add [mpc_playing_order+j], y
+	modplayer_apply_order(j, b, y, c)
 	set.l pc, pop
 
 ; slide to note
@@ -763,12 +802,7 @@ modplayer_tick:
 			; c now contains order/note
 			set.b y, [x]
 			bor c, y
-
-			set.l [mpc_order+j], c
-
-			; if there's a new note, replace the current playing one
-			ifn c, 0
-				set.l [mpc_last_order+j], c
+			set [mpc_order+j], c 
 
 			add x, 1
 
@@ -782,6 +816,9 @@ modplayer_tick:
 			bor b, y
 
 			set.l [mpc_ins+j], b
+
+			; finetune the note from order -> playing_order
+			mp_finetune_order(a, j, x, y, z)
 			
 			; read lower nibble -> y now contains effect
 			set.b y, [x]
