@@ -5,4 +5,5 @@ cflags    O3
 #compiler  clang
 #compiler  tcc
 lib       sdl
+ldflags   lm
 sourcedir src ../common
